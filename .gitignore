@@ -25,3 +25,6 @@ dist-ssr
 
 # Hand histories contain other players' names
 hand_histories/
+
+# Rust build output
+solver/target/

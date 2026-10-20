@@ -1,6 +1,6 @@
 import { HAND_GRID, type HandClass } from '../poker/hands'
 import type { Strategy } from '../poker/strategy'
-import { ACTION_COLORS } from './actionColors'
+import { actionColor } from './actionColors'
 
 interface Props {
   strategy: Strategy
@@ -12,16 +12,18 @@ interface Props {
 export function RangeGrid({ strategy, focusedAction, onHover }: Props) {
   return (
     <div className="range-grid" onMouseLeave={() => onHover(null)}>
-      {HAND_GRID.flat().map((hand) => (
-        <div
-          key={hand}
-          className="range-cell"
-          style={{ background: cellBackground(strategy, hand, focusedAction) }}
-          onMouseEnter={() => onHover(hand)}
-        >
-          {hand}
-        </div>
-      ))}
+      {HAND_GRID.flat().map((hand) => {
+        const weight = strategy.weights?.get(hand) ?? 1
+        return (
+          <div key={hand} className="range-cell" onMouseEnter={() => onHover(hand)}>
+            <div
+              className="range-fill"
+              style={{ height: `${weight * 100}%`, background: cellBackground(strategy, hand, focusedAction) }}
+            />
+            <span className="range-label">{hand}</span>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -34,12 +36,10 @@ function cellBackground(strategy: Strategy, hand: HandClass, focusedAction: numb
   frequencies.forEach((frequency, index) => {
     if (frequency === 0) return
     const color =
-      focusedAction === null || focusedAction === index
-        ? ACTION_COLORS[strategy.actions[index].kind]
-        : 'var(--cell-muted)'
+      focusedAction === null || focusedAction === index ? actionColor(strategy.actions[index]) : 'var(--cell-muted)'
     const end = position + frequency * 100
     stops.push(`${color} ${position}% ${end}%`)
     position = end
   })
-  return `linear-gradient(to right, ${stops.join(', ')})`
+  return stops.length === 0 ? 'transparent' : `linear-gradient(to right, ${stops.join(', ')})`
 }

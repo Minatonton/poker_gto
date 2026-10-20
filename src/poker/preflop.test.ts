@@ -28,7 +28,7 @@ describe('walkPreflop', () => {
   it('データのないポジションは自動でフォールドして次の判断へ進む', () => {
     const walk = walkPreflop(solution, ['fold'])
     expect(positions(walk)).toEqual(['UTG:fold', 'HJ:fold', 'CO:fold'])
-    expect(walk.steps.filter((s) => s.auto).map((s) => s.position)).toEqual(['HJ', 'CO'])
+    expect(walk.steps.filter((s) => s.strategy === null).map((s) => s.position)).toEqual(['HJ', 'CO'])
     if (walk.status === 'deciding') expect(walk.position).toBe('BTN')
   })
 

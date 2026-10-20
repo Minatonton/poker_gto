@@ -24,8 +24,8 @@ export interface PreflopSolution {
 export interface Step {
   position: Position
   action: Action
-  /** データがないため自動でフォールド扱いにしたアクション */
-  auto: boolean
+  /** そのときの戦略。データがないため自動でフォールド扱いにしたときは null */
+  strategy: Strategy | null
 }
 
 export type Walk =
@@ -35,7 +35,7 @@ export type Walk =
 const FOLD: Action = { kind: 'fold', label: 'Fold' }
 
 function toStrategy(spec: SpotSpec, raiseName: string): Strategy {
-  const raise: Action = { kind: 'raise', label: `${raiseName} ${spec.raiseTo}bb` }
+  const raise: Action = { kind: 'raise', label: `${raiseName} ${spec.raiseTo}bb`, amount: spec.raiseTo }
   const call: Action = { kind: 'call', label: 'Call' }
   return buildStrategy([
     { action: raise, range: spec.raise },
@@ -54,7 +54,7 @@ export function walkPreflop(solution: PreflopSolution, choices: readonly Action[
   let choiceIndex = 0
 
   const autoFold = (positions: readonly Position[]) => {
-    for (const position of positions) steps.push({ position, action: FOLD, auto: true })
+    for (const position of positions) steps.push({ position, action: FOLD, strategy: null })
   }
 
   const decide = (position: Position, strategy: Strategy): Action | null => {
@@ -62,7 +62,7 @@ export function walkPreflop(solution: PreflopSolution, choices: readonly Action[
     const kind = choices[choiceIndex++]
     const action = strategy.actions.find((a) => a.kind === kind)
     if (!action) throw new Error(`${position} は ${kind} を選べません`)
-    steps.push({ position, action, auto: false })
+    steps.push({ position, action, strategy })
     return action
   }
 
@@ -100,7 +100,7 @@ export function walkPreflop(solution: PreflopSolution, choices: readonly Action[
       if (response.kind === 'fold') continue
 
       autoFold(behind.slice(i + 1))
-      if (response.kind === 'call') return finished(`${opener} vs ${responder} でフロップへ（ポストフロップは未対応）`)
+      if (response.kind === 'call') return finished(`${opener} vs ${responder} でフロップへ`)
 
       const vs3bet = solution.vs3bet[opener]?.[responder]
       if (!vs3bet) return finished(`${opener} の3ベットへの対応データは未収録です`)
@@ -108,7 +108,7 @@ export function walkPreflop(solution: PreflopSolution, choices: readonly Action[
       const reply = decide(opener, vs3betStrategy)
       if (!reply) return deciding(opener, vs3betStrategy)
       if (reply.kind === 'fold') return finished(`${responder} がポットを獲得`)
-      if (reply.kind === 'call') return finished(`${opener} vs ${responder}（3ベットポット）でフロップへ（ポストフロップは未対応）`)
+      if (reply.kind === 'call') return finished(`${opener} vs ${responder}（3ベットポット）でフロップへ`)
       return finished('4ベット以降のデータは未収録です')
     }
     return finished(`${opener} がポットを獲得`)

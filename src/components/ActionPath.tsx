@@ -1,6 +1,6 @@
 import type { Walk } from '../poker/preflop'
 import { overallFrequencies, type ActionKind } from '../poker/strategy'
-import { ACTION_COLORS, formatPercent } from './actionColors'
+import { actionColor, formatPercent } from './actionColors'
 
 interface Props {
   walk: Walk
@@ -15,17 +15,18 @@ export function ActionPath({ walk, onRewind, onChoose }: Props) {
     <div className="action-path">
       {walk.steps.map((step, index) => {
         const rewindTo = choiceCount
-        if (!step.auto) choiceCount++
+        const auto = step.strategy === null
+        if (!auto) choiceCount++
         return (
           <button
             key={index}
-            className={`path-card ${step.auto ? 'auto' : ''}`}
-            disabled={step.auto}
+            className={`path-card ${auto ? 'auto' : ''}`}
+            disabled={auto}
             onClick={() => onRewind(rewindTo)}
-            title={step.auto ? 'データがないためフォールド扱い' : 'ここから選び直す'}
+            title={auto ? 'データがないためフォールド扱い' : 'ここから選び直す'}
           >
             <span className="path-position">{step.position}</span>
-            <span className="path-action" style={{ color: ACTION_COLORS[step.action.kind] }}>
+            <span className="path-action" style={{ color: actionColor(step.action) }}>
               {step.action.label}
             </span>
           </button>
@@ -52,7 +53,7 @@ function CurrentDecision({
         <button
           key={action.kind}
           className="choice"
-          style={{ borderColor: ACTION_COLORS[action.kind] }}
+          style={{ borderColor: actionColor(action) }}
           onClick={() => onChoose(action.kind)}
         >
           {action.label}
