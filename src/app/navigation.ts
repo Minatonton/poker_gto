@@ -8,7 +8,6 @@ export const SECTIONS: { section: Section; label: string; description: string }[
 ]
 
 export type AnalyzeView = 'hand' | 'compare'
-export type HandStep = 'preflop' | 'postflop'
 export type PracticeView = 'trainer' | 'drill' | 'review'
 
 export const ANALYZE_VIEWS: { value: AnalyzeView; label: string }[] = [

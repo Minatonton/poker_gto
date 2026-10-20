@@ -4,21 +4,20 @@ import {
   PRACTICE_VIEWS,
   SECTIONS,
   type AnalyzeView,
-  type HandStep,
   type PracticeView,
   type Section,
 } from './app/navigation'
 import { formatPercent } from './components/actionColors'
-import { PostflopView } from './components/postflop/PostflopView'
 import { cashSolution, MAX_PLAYERS, MIN_PLAYERS } from './data/cashSolutions'
 import { LearnPage } from './pages/LearnPage'
-import { PreflopPage } from './pages/PreflopPage'
+import { PostflopHand } from './pages/analyze/PostflopHand'
+import { PreflopHand } from './pages/analyze/PreflopHand'
 import { RangeDrillPage } from './pages/RangeDrillPage'
 import { ReportPage } from './pages/ReportPage'
 import { ReviewPage } from './pages/ReviewPage'
 import { TrainerPage } from './pages/TrainerPage'
 import { parseHero, type HeroInput } from './poker/hero'
-import type { PostflopSpot } from './poker/postflopSpot'
+import { spotFromWalk, type PostflopSpot } from './poker/postflopSpot'
 import { walkPreflop } from './poker/preflop'
 import { choicesForLine, lineOfWalk, type PreflopLine } from './poker/preflopLine'
 import type { ActionKind } from './poker/strategy'
@@ -54,12 +53,10 @@ function SubTabs<T extends string>({
 export default function App() {
   const [section, setSection] = useState<Section>('analyze')
   const [analyzeView, setAnalyzeView] = useState<AnalyzeView>('hand')
-  const [handStep, setHandStep] = useState<HandStep>('preflop')
   const [practiceView, setPracticeView] = useState<PracticeView>('trainer')
   const [players, setPlayers] = useState(6)
   const solution = useMemo(() => cashSolution(players), [players])
   const [choices, setChoices] = useState<ActionKind[]>([])
-  const [postflopSpot, setPostflopSpot] = useState<{ id: number; spot: PostflopSpot } | null>(null)
   const [heroInput, setHeroInput] = useState<HeroInput>({ position: null, cardsText: '' })
   // 「応じた人」だけを選んでアクションが未定のときは、辿ったラインからは選択を読み戻せないため、
   // 選択欄で選んだ内容を別に持つ。アクションラインで直接進めたら、辿ったラインの表示に戻す
@@ -71,6 +68,7 @@ export default function App() {
   const walk = useMemo(() => walkPreflop(solution, choices), [solution, choices])
   const line = useMemo(() => pickedLine ?? lineOfWalk(walk), [pickedLine, walk])
   const hero = useMemo(() => parseHero(heroInput), [heroInput])
+  const spotAtFlop = useMemo(() => spotFromWalk(walk), [walk])
 
   // 人数を変えると席の名前が変わるため、それまでのラインと、卓にいない自分の席は捨てる
   const changePlayers = (next: number) => {
@@ -78,7 +76,6 @@ export default function App() {
     setPlayers(next)
     setChoices([])
     setPickedLine(null)
-    setHandStep('preflop')
     if (heroInput.position && !nextPositions.includes(heroInput.position)) {
       setHeroInput({ ...heroInput, position: null })
     }
@@ -125,18 +122,11 @@ export default function App() {
     setHeroInput({ position: review.heroPosition, cardsText: review.heroCards })
     setSection('analyze')
     setAnalyzeView('hand')
-    setHandStep('preflop')
   }
 
-  const solveSpot = (spot: PostflopSpot) => {
-    setPostflopSpot((current) => ({ id: (current?.id ?? 0) + 1, spot }))
-    setHandStep('postflop')
-  }
-
-  const openPreflop = () => {
+  const openAnalyze = () => {
     setSection('analyze')
     setAnalyzeView('hand')
-    setHandStep('preflop')
   }
 
   return (
@@ -172,26 +162,22 @@ export default function App() {
         <SubTabs options={ANALYZE_VIEWS} value={analyzeView} onChange={setAnalyzeView} />
 
         <div hidden={analyzeView !== 'hand'} className="page-stack">
-          <ol className="steps" aria-label="分析の手順">
-            <li>
-              <button aria-current={handStep === 'preflop' ? 'step' : undefined} onClick={() => setHandStep('preflop')}>
-                <span className="step-number">1</span> プリフロップを入力
-              </button>
-            </li>
-            <li>
-              <button
-                aria-current={handStep === 'postflop' ? 'step' : undefined}
-                onClick={() => setHandStep('postflop')}
-                disabled={!postflopSpot}
-                title={postflopSpot ? undefined : 'プリフロップでフロップまで進むと選べます'}
-              >
-                <span className="step-number">2</span> フロップ以降をソルブ
-              </button>
-            </li>
-          </ol>
-
-          <div hidden={handStep !== 'preflop'} className="page-stack">
-            <PreflopPage
+          {walk.status === 'finished' && spotAtFlop ? (
+            // ラインが変わったらソルブ結果も別物になるため、ラインごとに作り直す
+            <PostflopHand
+              key={`${players}-${choices.join()}`}
+              spot={spotAtFlop}
+              walk={walk}
+              choices={choices}
+              onNavigate={navigate}
+              heroInput={heroInput}
+              hero={hero}
+              onHeroInput={setHeroInput}
+              onRecord={recordHand}
+              onSolved={() => setSolvedSpot(spotAtFlop)}
+            />
+          ) : (
+            <PreflopHand
               solution={solution}
               walk={walk}
               choices={choices}
@@ -204,41 +190,20 @@ export default function App() {
               heroInput={heroInput}
               hero={hero}
               onHeroInput={setHeroInput}
-              onSolveSpot={solveSpot}
               onRecord={recordHand}
             />
-          </div>
-
-          {/* ソルブ結果を保つため、手順を切り替えてもポストフロップの画面はアンマウントしない */}
-          <div hidden={handStep !== 'postflop'} className="page-stack">
-            {postflopSpot && (
-              <>
-                <div className="page-header">
-                  <h1>{postflopSpot.spot.name}</h1>
-                  <button className="btn small-btn" onClick={() => setHandStep('preflop')}>
-                    プリフロップに戻る
-                  </button>
-                </div>
-                <PostflopView
-                  key={postflopSpot.id}
-                  spot={postflopSpot.spot}
-                  hero={hero}
-                  onSolved={() => setSolvedSpot(postflopSpot.spot)}
-                />
-              </>
-            )}
-          </div>
+          )}
         </div>
 
         <div hidden={analyzeView !== 'compare'} className="page-stack">
-          <ReportPage spot={postflopSpot?.spot ?? null} onOpenPreflop={openPreflop} />
+          <ReportPage spot={spotAtFlop} onOpenPreflop={openAnalyze} />
         </div>
       </main>
 
       <main className="page" hidden={section !== 'practice'}>
         <SubTabs options={PRACTICE_VIEWS} value={practiceView} onChange={setPracticeView} />
         <div hidden={practiceView !== 'trainer'} className="page-stack">
-          <TrainerPage key={players} solution={solution} solvedSpot={solvedSpot} onOpenAnalyze={openPreflop} />
+          <TrainerPage key={players} solution={solution} solvedSpot={solvedSpot} onOpenAnalyze={openAnalyze} />
         </div>
         <div hidden={practiceView !== 'drill'} className="page-stack">
           <RangeDrillPage key={players} solution={solution} />

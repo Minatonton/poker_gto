@@ -1,56 +1,59 @@
-import type { HandClass } from '../../poker/hands'
-import { overallFrequencies, type Strategy } from '../../poker/strategy'
-import { actionColor, formatPercent } from '../actionColors'
+import { useEffect, useRef } from 'react'
+import type { Action } from '../../poker/strategy'
+import { actionColor } from '../actionColors'
+import { actionForKey } from './shortcuts'
 
 interface Props {
-  actor: string
-  strategy: Strategy
-  /** GTO の頻度をボタンに出すか。出さなければ実戦のように自分で判断してから答え合わせできる */
-  showFrequencies: boolean
-  onToggleFrequencies: () => void
-  /** 手番が自分のとき、自分のハンドの頻度もボタンに出す */
-  heroHand?: HandClass | null
+  actions: Action[]
   onChoose: (index: number) => void
+  disabled?: boolean
 }
 
-/** 手番のプレイヤーのアクションボタン。ゲームの操作パネルのように大きく並べる */
-export function ActionBar({ actor, strategy, showFrequencies, onToggleFrequencies, heroHand, onChoose }: Props) {
-  const overall = overallFrequencies(strategy)
-  const heroFrequencies = heroHand ? strategy.frequencies.get(heroHand) : undefined
+/** ボタンに添えるキー。R は最初のベット・レイズにだけ割り当てている */
+function shortcutOf(actions: Action[], index: number): string {
+  const letter = { fold: 'F', call: 'C', raise: 'R' }[actions[index].kind]
+  const firstOfKind = actions.findIndex((a) => a.kind === actions[index].kind) === index
+  return firstOfKind ? `${index + 1} / ${letter}` : `${index + 1}`
+}
+
+/**
+ * 手番の人の操作ボタン。ゲームの操作パネルのように卓のすぐ下に大きく並べ、キーボードでも押せるようにする。
+ * GTO の頻度はここには出さず、隣の「GTO の答え」に出す。ボタンは「実際に起きたこと」を入れる場所なので
+ */
+export function ActionBar({ actions, onChoose, disabled = false }: Props) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (disabled) return
+    const onKey = (event: KeyboardEvent) => {
+      // 分析と壁打ちは切り替えても画面に残しているため、見えていない画面のボタンはキーに反応させない
+      if (!ref.current || ref.current.offsetParent === null) return
+      const target = event.target as HTMLElement | null
+      if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      const index = actionForKey(actions, event.key)
+      if (index !== null) {
+        event.preventDefault()
+        onChoose(index)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [actions, onChoose, disabled])
+
   return (
-    <div className="action-bar">
-      <div className="action-bar-head">
-        <span>
-          <strong>{actor}</strong> のアクション
-        </span>
-        <label className="checkbox-row">
-          <input type="checkbox" checked={showFrequencies} onChange={onToggleFrequencies} />
-          GTO の頻度を表示
-        </label>
-      </div>
-      <div className="action-buttons">
-        {strategy.actions.map((action, index) => (
-          <button
-            key={action.label}
-            className={`action-button kind-${action.kind}`}
-            style={{ '--action': actionColor(action) } as React.CSSProperties}
-            onClick={() => onChoose(index)}
-          >
-            <span className="action-button-label">{action.label}</span>
-            {showFrequencies && (
-              <span className="action-button-freq num">
-                {heroFrequencies ? `${heroHand} ${formatPercent(heroFrequencies[index])}` : `レンジ ${formatPercent(overall[index])}`}
-              </span>
-            )}
-            {showFrequencies && (
-              <span
-                className="action-button-bar"
-                style={{ width: `${(heroFrequencies ? heroFrequencies[index] : overall[index]) * 100}%` }}
-              />
-            )}
-          </button>
-        ))}
-      </div>
+    <div className="action-buttons" ref={ref}>
+      {actions.map((action, index) => (
+        <button
+          key={action.label}
+          className={`action-button kind-${action.kind}`}
+          style={{ '--action': actionColor(action) } as React.CSSProperties}
+          onClick={() => onChoose(index)}
+          disabled={disabled}
+        >
+          <span className="action-button-label">{action.label}</span>
+          <kbd className="action-key">{shortcutOf(actions, index)}</kbd>
+        </button>
+      ))}
     </div>
   )
 }

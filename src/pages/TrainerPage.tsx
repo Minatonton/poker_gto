@@ -13,6 +13,16 @@ import { toActions, toBb } from '../solver/aggregate'
 import { SolverClient } from '../solver/client'
 import type { NodeInfo } from '../solver/types'
 import { GRADES, actionForRng, gradeByEv, gradeByFrequency, type Grade } from '../trainer/grading'
+import {
+  accuracy,
+  DAILY_GOAL,
+  emptyProgress,
+  normalizeProgress,
+  recordAnswer,
+  todayCount,
+  type Progress,
+} from '../trainer/progress'
+import { ActionBar } from '../components/table/ActionBar'
 import { dealNextCard, dealPostflopHands, villainAction } from '../trainer/postflopHand'
 import { createPreflopQuestion, PREFLOP_DRILLS, type PreflopDrillKind, type PreflopQuestion } from '../trainer/preflopDrill'
 import { explainPostflop, explainPreflop } from '../trainer/explain'
@@ -22,23 +32,23 @@ import { classifyHand } from '../poker/handCategory'
 import { breakdownNode } from '../solver/breakdown'
 
 type Mode = 'preflop' | 'postflop'
-type Stats = Record<Grade, number>
 
-const EMPTY_STATS: Stats = { best: 0, correct: 0, inaccuracy: 0, wrong: 0, blunder: 0 }
 const STATS_KEY = 'poker-gto:trainer-stats'
 
 /** 成績は端末のブラウザにだけ残す。消えても困らない練習の記録なので、読み書きに失敗しても無視する */
-function loadStats(): Record<Mode, Stats> {
+function loadStats(): Record<Mode, Progress> {
   try {
     const saved = JSON.parse(localStorage.getItem(STATS_KEY) ?? 'null')
-    if (saved?.preflop && saved?.postflop) return saved
+    if (saved?.preflop && saved?.postflop) {
+      return { preflop: normalizeProgress(saved.preflop), postflop: normalizeProgress(saved.postflop) }
+    }
   } catch {
     // 保存できない環境では、その場限りの成績にする
   }
-  return { preflop: { ...EMPTY_STATS }, postflop: { ...EMPTY_STATS } }
+  return { preflop: emptyProgress(), postflop: emptyProgress() }
 }
 
-function saveStats(stats: Record<Mode, Stats>) {
+function saveStats(stats: Record<Mode, Progress>) {
   try {
     localStorage.setItem(STATS_KEY, JSON.stringify(stats))
   } catch {
@@ -60,20 +70,15 @@ export function TrainerPage({ solution, solvedSpot, onOpenAnalyze }: Props) {
 
   const record = (grade: Grade) =>
     setStats((current) => {
-      const next = { ...current, [mode]: { ...current[mode], [grade]: current[mode][grade] + 1 } }
+      const next = { ...current, [mode]: recordAnswer(current[mode], grade) }
       saveStats(next)
       return next
     })
 
   return (
     <>
-      <div className="page-header">
-        <h1>トレーナー</h1>
-        <span className="caption">GTO を相手に判断し、頻度と EV の損失で採点します。</span>
-      </div>
-
       <section className="card">
-        <div className="card-body scenario">
+        <div className="card-body scenario inline">
           <Segmented<Mode>
             label="出題"
             options={[
@@ -85,7 +90,8 @@ export function TrainerPage({ solution, solvedSpot, onOpenAnalyze }: Props) {
           />
           <label className="checkbox-row">
             <input type="checkbox" checked={useRng} onChange={(e) => setUseRng(e.target.checked)} />
-            RNG を使う（出目に当たる区間のアクションだけを Best にして、混合戦略を頻度どおりに選ぶ練習をする）
+            RNG を使う
+            <span className="muted small">出目に当たるアクションだけを Best にして、混合戦略を頻度どおりに選ぶ練習</span>
           </label>
         </div>
       </section>
@@ -105,10 +111,10 @@ export function TrainerPage({ solution, solvedSpot, onOpenAnalyze }: Props) {
             </section>
           )}
         </div>
-        <StatsCard
-          stats={stats[mode]}
+        <ProgressCard
+          progress={stats[mode]}
           onReset={() => {
-            const next = { ...stats, [mode]: { ...EMPTY_STATS } }
+            const next = { ...stats, [mode]: emptyProgress() }
             saveStats(next)
             setStats(next)
           }}
@@ -307,19 +313,8 @@ function Question({
         )}
         {rng !== undefined && <span className="rng">RNG {Math.floor(rng * 100)}</span>}
       </div>
-      <div className="question-actions">
-        {actions.map((action, index) => (
-          <button
-            key={action.label}
-            className="choice answer"
-            style={{ '--action': actionColor(action) } as React.CSSProperties}
-            disabled={answered}
-            onClick={() => onChoose(index)}
-          >
-            <span className="choice-label">{action.label}</span>
-          </button>
-        ))}
-      </div>
+      {/* 答えたあとはボタンを消し、同じ場所に採点を出す。視線を動かさずに結果が見えるように */}
+      {!answered && <ActionBar actions={actions} onChoose={onChoose} />}
     </div>
   )
 }
@@ -351,8 +346,23 @@ function Feedback({
   explanation?: string[]
 }) {
   const info = GRADES.find((g) => g.grade === grade)!
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    ref.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [])
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (!ref.current || ref.current.offsetParent === null) return
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault()
+        onNext()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onNext])
   return (
-    <div className={`feedback grade-${grade}`}>
+    <div className={`feedback grade-${grade}`} ref={ref}>
       <div className="feedback-head">
         <strong>{info.label}</strong>
         <span className="muted small">{info.description}</span>
@@ -390,7 +400,7 @@ function Feedback({
       )}
       <div className="finished-actions">
         <button className="btn primary" onClick={onNext}>
-          {nextLabel}
+          {nextLabel} <kbd className="action-key">Enter</kbd>
         </button>
         {extra}
       </div>
@@ -398,9 +408,10 @@ function Feedback({
   )
 }
 
-function StatsCard({ stats, onReset }: { stats: Stats; onReset: () => void }) {
-  const total = Object.values(stats).reduce((sum, n) => sum + n, 0)
-  const good = stats.best + stats.correct
+function ProgressCard({ progress, onReset }: { progress: Progress; onReset: () => void }) {
+  const today = todayCount(progress)
+  const rate = accuracy(progress)
+  const total = Object.values(progress.grades).reduce((sum, n) => sum + n, 0)
   return (
     <section className="card trainer-stats">
       <header className="card-header">
@@ -409,19 +420,37 @@ function StatsCard({ stats, onReset }: { stats: Stats; onReset: () => void }) {
           リセット
         </button>
       </header>
-      <dl className="calc-results stats-list">
+      <div className="progress-hero">
         <div>
-          <dt>回答数</dt>
-          <dd className="num">{total}</dd>
+          <span className="muted small">連続正解</span>
+          <strong className="num streak">{progress.streak}</strong>
+          <span className="muted small">最高 {progress.bestStreak}</span>
         </div>
         <div>
-          <dt>Best + Correct の割合</dt>
-          <dd className="num">{total ? formatPercent(good / total) : '—'}</dd>
+          <span className="muted small">今日</span>
+          <strong className="num">
+            {today}
+            <span className="muted small"> / {DAILY_GOAL} 問</span>
+          </strong>
+          <span className="progress-track daily">
+            <span style={{ width: `${Math.min(1, today / DAILY_GOAL) * 100}%` }} />
+          </span>
+          {today >= DAILY_GOAL && <span className="small goal-done">今日の目標を達成しました</span>}
+        </div>
+      </div>
+      <dl className="calc-results stats-list">
+        <div>
+          <dt>正答率（Best + Correct）</dt>
+          <dd className="num">{rate === null ? '—' : formatPercent(rate)}</dd>
+        </div>
+        <div>
+          <dt>これまでの回答数</dt>
+          <dd className="num">{total}</dd>
         </div>
         {GRADES.map(({ grade, label }) => (
           <div key={grade}>
             <dt>{label}</dt>
-            <dd className="num">{stats[grade]}</dd>
+            <dd className="num">{progress.grades[grade]}</dd>
           </div>
         ))}
       </dl>

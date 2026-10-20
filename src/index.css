@@ -792,6 +792,13 @@ button.action-row:hover {
   gap: 10px;
 }
 
+.scenario.inline {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 32px;
+}
+
 .segmented-row {
   display: grid;
   grid-template-columns: 84px minmax(0, 1fr);
@@ -1341,8 +1348,8 @@ textarea {
 
 .poker-table {
   position: relative;
-  height: clamp(340px, 46vh, 460px);
-  margin: 8px 16px 0;
+  height: clamp(360px, 48vh, 480px);
+  margin: 12px 16px 16px;
 }
 
 /* 卓の面は無彩色にして、アクションとスートの色だけが目立つようにしている */
@@ -1432,8 +1439,17 @@ textarea {
   box-shadow: 0 2px 8px rgb(0 0 0 / 0.4);
 }
 
-.seat:hover .seat-plate {
+.seat-plate:hover:not(:disabled) {
   border-color: var(--label);
+}
+
+.seat-plate {
+  font: inherit;
+  color: inherit;
+}
+
+.seat-plate:disabled {
+  cursor: default;
 }
 
 .seat.acting .seat-plate {
@@ -1650,7 +1666,7 @@ textarea {
 
 .history-row {
   display: grid;
-  grid-template-columns: 52px 1fr;
+  grid-template-columns: 72px 1fr;
   width: 100%;
   padding: 6px 8px;
   font-size: 13px;
@@ -2204,4 +2220,338 @@ main.page {
   margin: 8px 0 0;
   font-size: 14px;
   color: var(--label);
+}
+
+
+/* ---------- 分析の卓 ---------- */
+
+.coach {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin: 0;
+  padding: 12px 18px;
+  font-size: 15px;
+  color: var(--body);
+  border-bottom: 1px solid var(--mist);
+}
+
+.coach strong {
+  color: var(--ink);
+}
+
+.coach-hint {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.controls {
+  padding: 16px;
+  border-top: 1px solid var(--mist);
+}
+
+.table-board {
+  display: flex;
+  gap: 6px;
+}
+
+.table-board .playing-card,
+.card-slot {
+  width: 44px;
+  height: 60px;
+  font-size: 20px;
+}
+
+.card-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--label);
+  background: rgb(255 255 255 / 0.03);
+  border: 2px dashed var(--line-strong);
+  border-radius: 6px;
+}
+
+.card-slot.pick:not(:disabled) {
+  cursor: pointer;
+  border-color: var(--label);
+  animation: slot-pulse 1.6s ease-in-out infinite;
+}
+
+.card-slot.pick:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--accent);
+}
+
+.card-slot.small {
+  width: 30px;
+  height: 40px;
+  font-size: 14px;
+}
+
+.seat-cards .card-slot {
+  width: 34px;
+  height: 46px;
+  font-size: 16px;
+}
+
+@keyframes slot-pulse {
+  50% {
+    border-color: var(--accent);
+  }
+}
+
+.hero-cards-button {
+  padding: 0;
+  background: transparent;
+  border: none;
+}
+
+.hero-cards-button:hover .playing-card {
+  outline: 2px solid var(--accent);
+}
+
+.table-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(10 11 13 / 0.7);
+  border-radius: var(--radius-md);
+}
+
+.card-select {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(640px, 94%);
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 40px rgb(0 0 0 / 0.6);
+}
+
+.card-select-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.card-select-picked {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.card-select-grid {
+  display: grid;
+  grid-template-columns: repeat(13, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.card-select-grid button {
+  padding: 0;
+  background: transparent;
+  border: none;
+}
+
+.card-select-grid .playing-card {
+  width: 100%;
+  height: 40px;
+  font-size: 14px;
+}
+
+.card-select-grid button.picked .playing-card {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.card-select-grid button:disabled .playing-card {
+  opacity: 0.15;
+}
+
+.action-key {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.advice-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px 16px;
+}
+
+.advice-subject {
+  font-size: 13px;
+  color: var(--sub);
+}
+
+.advice-subject strong {
+  font-family: var(--mono);
+  color: var(--ink);
+}
+
+.advice-answer {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.advice-answer-freq {
+  font-size: 18px;
+  color: var(--ink);
+}
+
+.advice-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.advice-bars li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 90px 54px auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.advice-bar-label {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.advice-bar-track {
+  height: 8px;
+  overflow: hidden;
+  background: var(--mist);
+  border-radius: 999px;
+}
+
+.advice-bar-track span {
+  display: block;
+  height: 100%;
+}
+
+.advice-bars .num {
+  text-align: right;
+}
+
+.advice-ev {
+  min-width: 56px;
+}
+
+.solving-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  font-size: 13px;
+  background: rgb(0 0 0 / 0.45);
+  border-radius: 999px;
+}
+
+.solving-ring {
+  width: 16px;
+  height: 16px;
+  background: conic-gradient(var(--accent) var(--progress), var(--mist) 0);
+  border-radius: 999px;
+}
+
+.solve-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.solve-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.solve-options > summary {
+  color: var(--label);
+  cursor: pointer;
+}
+
+.solve-options[open] {
+  padding: 12px;
+  background: var(--bg-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.solve-result {
+  padding: 0 4px;
+}
+
+.detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.detail-heading {
+  margin: 8px 0 0;
+  font-size: 15px;
+  color: var(--sub);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-slot.pick:not(:disabled) {
+    animation: none;
+  }
+}
+
+.progress-hero {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: 1px solid var(--mist);
+}
+
+.progress-hero > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+}
+
+.progress-hero > div + div {
+  border-left: 1px solid var(--mist);
+}
+
+.progress-hero strong {
+  font-size: 24px;
+  line-height: 1.1;
+}
+
+.progress-hero .streak {
+  font-size: 34px;
+}
+
+.progress-track.daily {
+  height: 6px;
+}
+
+.goal-done {
+  color: var(--action-call);
+}
+
+.question .action-buttons {
+  max-width: 720px;
 }
