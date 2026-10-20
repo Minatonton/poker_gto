@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { parseBoard, randomFlop } from '../../poker/cards'
+import { displayBoard, parseBoard, randomFlop } from '../../poker/cards'
 import type { PostflopSpot } from '../../poker/postflopSpot'
 import { toRangeNotation } from '../../poker/postflopSpot'
 import { CHIPS_PER_BB, type SolveOptions, type SpotConfig, type StreetSizes } from '../../solver/types'
@@ -63,68 +63,110 @@ export function SolveSettings({ spot, disabled, onSolve }: Props) {
   }
 
   return (
-    <section className="panel solve-settings">
-      <h2>{spot.name}</h2>
-      <p className="hint">
-        ポット {spot.potBb}bb / 有効スタック {spot.effectiveStackBb}bb / OOP: {spot.oop}, IP: {spot.ip}
-      </p>
+    <section className="card">
+      <header className="card-header">ソルブ条件</header>
+      <dl className="spot-facts">
+        <div>
+          <dt>ポジション</dt>
+          <dd>
+            {spot.oop} / {spot.ip}
+          </dd>
+        </div>
+        <div>
+          <dt>ポット</dt>
+          <dd className="num">{spot.potBb}bb</dd>
+        </div>
+        <div>
+          <dt>有効スタック</dt>
+          <dd className="num">{spot.effectiveStackBb}bb</dd>
+        </div>
+      </dl>
 
-      <label className="field">
-        <span>ボード</span>
-        <input value={boardText} onChange={(e) => setBoardText(e.target.value)} placeholder="As Kd 7c" />
-        <button type="button" onClick={() => setBoardText(randomFlop().join(' '))}>
-          ランダム
+      <form
+        className="settings-form"
+        onSubmit={(e) => {
+          e.preventDefault()
+          submit()
+        }}
+      >
+        <label className="field">
+          <span>ボード</span>
+          <div className="board-input">
+            <input value={boardText} onChange={(e) => setBoardText(e.target.value)} placeholder="例: As Kd 7c" />
+            <button type="button" className="btn" onClick={() => setBoardText(randomFlop().join(' '))}>
+              ランダム
+            </button>
+          </div>
+        </label>
+        <div className="board-preview">
+          {board ? <BoardCards cards={displayBoard(board)} /> : <span className="error small">{boardError}</span>}
+        </div>
+
+        <div className="field">
+          <span>ベットサイズ（ベットはポット比 % とオールイン a、レイズは前のベットの倍率 x）</span>
+          <div className="size-grid">
+            <span />
+            <span className="head">ベット</span>
+            <span className="head">レイズ</span>
+            {(Object.keys(STREET_LABELS) as Street[]).map((street) => (
+              <SizeRow
+                key={street}
+                label={STREET_LABELS[street]}
+                value={sizes[street]}
+                onChange={(value) => setSizes({ ...sizes, [street]: value })}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="field-pair">
+          <label className="field">
+            <span>最大反復回数</span>
+            <input
+              type="number"
+              min={10}
+              value={maxIterations}
+              onChange={(e) => setMaxIterations(Number(e.target.value))}
+            />
+          </label>
+          <label className="field">
+            <span>目標精度（ポット比 %）</span>
+            <input
+              type="number"
+              min={0.1}
+              step={0.1}
+              value={targetPercent}
+              onChange={(e) => setTargetPercent(Number(e.target.value))}
+            />
+          </label>
+        </div>
+
+        <button type="submit" className="btn primary large" disabled={disabled || !board}>
+          ソルブする
         </button>
-        {board ? <BoardCards cards={board} /> : <span className="error">{boardError}</span>}
-      </label>
-
-      <table className="size-table">
-        <thead>
-          <tr>
-            <th />
-            <th>ベット（ポット比 % / オールイン a）</th>
-            <th>レイズ（前のベットの倍率 x）</th>
-          </tr>
-        </thead>
-        <tbody>
-          {(Object.keys(STREET_LABELS) as Street[]).map((street) => (
-            <tr key={street}>
-              <th>{STREET_LABELS[street]}</th>
-              {(['bet', 'raise'] as const).map((field) => (
-                <td key={field}>
-                  <input
-                    value={sizes[street][field]}
-                    onChange={(e) =>
-                      setSizes({ ...sizes, [street]: { ...sizes[street], [field]: e.target.value } })
-                    }
-                  />
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      <div className="field-row">
-        <label className="field">
-          <span>最大反復回数</span>
-          <input type="number" min={10} value={maxIterations} onChange={(e) => setMaxIterations(Number(e.target.value))} />
-        </label>
-        <label className="field">
-          <span>目標 exploitability（ポット比 %）</span>
-          <input
-            type="number"
-            min={0.1}
-            step={0.1}
-            value={targetPercent}
-            onChange={(e) => setTargetPercent(Number(e.target.value))}
-          />
-        </label>
-      </div>
-
-      <button className="primary" disabled={disabled || !board} onClick={submit}>
-        ソルブ開始
-      </button>
+      </form>
     </section>
+  )
+}
+
+function SizeRow({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: { bet: string; raise: string }
+  onChange: (value: { bet: string; raise: string }) => void
+}) {
+  return (
+    <>
+      <span>{label}</span>
+      <input aria-label={`${label}のベット`} value={value.bet} onChange={(e) => onChange({ ...value, bet: e.target.value })} />
+      <input
+        aria-label={`${label}のレイズ`}
+        value={value.raise}
+        onChange={(e) => onChange({ ...value, raise: e.target.value })}
+      />
+    </>
   )
 }

@@ -6,22 +6,35 @@ interface Props {
   strategy: Strategy
   /** 指定すると、そのアクションの頻度だけを色付けして表示する */
   focusedAction: number | null
+  selectedHand: HandClass | null
   onHover: (hand: HandClass | null) => void
+  onSelect: (hand: HandClass | null) => void
 }
 
-export function RangeGrid({ strategy, focusedAction, onHover }: Props) {
+/** 塗りが左上のラベルまで届かないセルでは、白い文字が背景に埋もれるため濃い文字にする */
+const LABEL_ON_FILL_MIN_WEIGHT = 0.75
+
+export function RangeGrid({ strategy, focusedAction, selectedHand, onHover, onSelect }: Props) {
   return (
     <div className="range-grid" onMouseLeave={() => onHover(null)}>
       {HAND_GRID.flat().map((hand) => {
         const weight = strategy.weights?.get(hand) ?? 1
+        const labelOnBackground = weight < LABEL_ON_FILL_MIN_WEIGHT
         return (
-          <div key={hand} className="range-cell" onMouseEnter={() => onHover(hand)}>
-            <div
+          <button
+            key={hand}
+            className={`range-cell ${weight === 0 ? 'unreached' : labelOnBackground ? 'partial' : ''} ${selectedHand === hand ? 'selected' : ''}`}
+            onMouseEnter={() => onHover(hand)}
+            onFocus={() => onHover(hand)}
+            onClick={() => onSelect(selectedHand === hand ? null : hand)}
+            aria-label={hand}
+          >
+            <span
               className="range-fill"
               style={{ height: `${weight * 100}%`, background: cellBackground(strategy, hand, focusedAction) }}
             />
             <span className="range-label">{hand}</span>
-          </div>
+          </button>
         )
       })}
     </div>
@@ -36,7 +49,7 @@ function cellBackground(strategy: Strategy, hand: HandClass, focusedAction: numb
   frequencies.forEach((frequency, index) => {
     if (frequency === 0) return
     const color =
-      focusedAction === null || focusedAction === index ? actionColor(strategy.actions[index]) : 'var(--cell-muted)'
+      focusedAction === null || focusedAction === index ? actionColor(strategy.actions[index]) : 'var(--cell-dimmed)'
     const end = position + frequency * 100
     stops.push(`${color} ${position}% ${end}%`)
     position = end

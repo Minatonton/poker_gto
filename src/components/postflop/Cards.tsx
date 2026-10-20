@@ -2,11 +2,12 @@ import { SUITS, cardFromId } from '../../poker/cards'
 
 const SUIT_SYMBOLS: Record<string, string> = { c: '♣', d: '♦', h: '♥', s: '♠' }
 
+/** スートを色の面で見分けられる4色デッキ */
 export function PlayingCard({ card }: { card: string }) {
   return (
-    <span className={`playing-card suit-${card[1]}`}>
+    <span className={`playing-card suit-${card[1]}`} aria-label={card}>
       {card[0]}
-      {SUIT_SYMBOLS[card[1]]}
+      <small>{SUIT_SYMBOLS[card[1]]}</small>
     </span>
   )
 }
