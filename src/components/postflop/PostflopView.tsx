@@ -2,13 +2,16 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { cardFromId, displayBoard, isSameHoleCards } from '../../poker/cards'
 import { heroHandFor, type Hero } from '../../poker/hero'
 import type { PostflopSpot } from '../../poker/postflopSpot'
+import { seatsFromBottom } from '../../poker/table'
 import { aggregateNode, toActions, toBb } from '../../solver/aggregate'
 import { SolverClient, type SolvedStatus } from '../../solver/client'
 import type { NodeInfo, PlayerNode, SolveOptions, SolverStatus, SpotConfig } from '../../solver/types'
 import { actionColor, formatPercent } from '../actionColors'
-import { DecisionBar } from '../DecisionBar'
 import { StudyView } from '../StudyView'
-import { BoardCards, CardPicker, PlayingCard } from './Cards'
+import { ActionBar } from '../table/ActionBar'
+import { HandHistory, type HistoryEntry } from '../table/HandHistory'
+import { PokerTable, type SeatView } from '../table/PokerTable'
+import { BoardCards, CardPicker } from './Cards'
 import { EquityGraph, RangeSummaryCard } from './RangeSummary'
 import { SolveSettings } from './SolveSettings'
 
@@ -39,15 +42,23 @@ export function PostflopView({ spot, hero, onSolved }: Props) {
   const [error, setError] = useState('')
   const [path, setPath] = useState<PathEntry[]>([])
   const [node, setNode] = useState<NodeInfo | null>(null)
+  const [showFrequencies, setShowFrequencies] = useState(true)
+  // ストリートの最初のノードのベット額を覚えておき、いまのストリートで前に出したチップを求める
+  const [visited, setVisited] = useState(() => new Map<string, NodeInfo>())
 
   useEffect(() => () => clientRef.current?.dispose(), [])
 
   useEffect(() => {
     if (phase.name !== 'solved' || !clientRef.current) return
     let cancelled = false
+    const history = path.map((p) => p.choice)
     clientRef.current
-      .node(path.map((p) => p.choice))
-      .then((next) => !cancelled && setNode(next))
+      .node(history)
+      .then((next) => {
+        if (cancelled) return
+        setVisited((current) => new Map(current).set(history.join(), next))
+        setNode(next)
+      })
       .catch((e: Error) => setError(e.message))
     return () => {
       cancelled = true
@@ -59,6 +70,7 @@ export function PostflopView({ spot, hero, onSolved }: Props) {
     setError('')
     setPath([])
     setNode(null)
+    setVisited(new Map())
     const startingPot = config.startingPot
     setPhase({ name: 'solving', startingPot, options })
     try {
@@ -87,6 +99,7 @@ export function PostflopView({ spot, hero, onSolved }: Props) {
             </header>
           </section>
         )}
+        {phase.name === 'solved' && <HandHistory entries={historyEntries(path, setPath)} />}
       </div>
 
       <div className="postflop-main">
@@ -97,22 +110,17 @@ export function PostflopView({ spot, hero, onSolved }: Props) {
         )}
         {phase.name === 'solved' && node ? (
           <>
-            <section className="card">
-              <div className="node-meta">
-                <BoardCards cards={displayBoard(node.board)} />
-                <span className="pot">
-                  ポット<strong>{toBb(node.pot).toFixed(2)}bb</strong>
-                </span>
-              </div>
-              <PostflopPath spot={spot} node={node} path={path} onPath={setPath} />
-            </section>
-            <NodeBody
-              key={path.length}
+            <PostflopTable
               spot={spot}
               hero={hero}
               node={node}
-              onPick={(entry) => setPath([...path, entry])}
+              path={path}
+              streetStart={visited.get(streetStartHistory(path).join())}
+              showFrequencies={showFrequencies}
+              onToggleFrequencies={() => setShowFrequencies(!showFrequencies)}
+              onPath={setPath}
             />
+            <NodeBody key={path.length} spot={spot} hero={hero} node={node} />
           </>
         ) : phase.name === 'solving' ? (
           <SolvingStatus phase={phase} onStop={() => clientRef.current?.stop()} />
@@ -165,85 +173,118 @@ function SolvingStatus({ phase, onStop }: { phase: Extract<Phase, { name: 'solvi
 
 const STREET_AFTER_CARD = ['ターン', 'リバー']
 
-function PostflopPath({
-  spot,
-  node,
-  path,
-  onPath,
-}: {
-  spot: PostflopSpot
-  node: NodeInfo
-  path: PathEntry[]
-  onPath: (path: PathEntry[]) => void
-}) {
-  const aggregated = useMemo(() => (node.kind === 'player' ? aggregateNode(node) : null), [node])
-  const actor = node.kind === 'player' ? (node.player === 0 ? spot.oop : spot.ip) : ''
-  let cardsDealt = 0
-
-  return (
-    <div className="action-line">
-      {path.map((entry, index) => {
-        const rewind = () => onPath(path.slice(0, index))
-        if (entry.kind === 'card') {
-          return (
-            <button key={index} className="step card-step" onClick={rewind} title="ここから選び直す">
-              <span className="step-actor">{STREET_AFTER_CARD[cardsDealt++]}</span>
-              <PlayingCard card={entry.card} />
-            </button>
-          )
-        }
-        return (
-          <button
-            key={index}
-            className="step"
-            onClick={rewind}
-            title="ここから選び直す"
-            style={{ '--action': entry.color } as React.CSSProperties}
-          >
-            <span className="step-actor">{entry.actor}</span>
-            <span className="step-action">{entry.label}</span>
-          </button>
-        )
-      })}
-      {aggregated && (
-        <DecisionBar
-          actor={actor}
-          strategy={aggregated.strategy}
-          onChoose={(index) => {
-            const action = aggregated.strategy.actions[index]
-            onPath([...path, { kind: 'action', choice: index, actor, label: action.label, color: actionColor(action) }])
-          }}
-        />
-      )}
-      {node.kind === 'terminal' && <span className="muted small">このラインはここで終わりです</span>}
-    </div>
-  )
+/** いまのストリートが始まったときの履歴（最後に配られたカードまで） */
+function streetStartHistory(path: PathEntry[]): number[] {
+  const lastCard = path.findLastIndex((entry) => entry.kind === 'card')
+  return path.slice(0, lastCard + 1).map((entry) => entry.choice)
 }
 
-function NodeBody({
-  spot,
-  hero,
-  node,
-  onPick,
-}: {
+function historyEntries(path: PathEntry[], onPath: (path: PathEntry[]) => void): HistoryEntry[] {
+  let cardsDealt = 0
+  return path.map((entry, index) => {
+    const onRewind = () => onPath(path.slice(0, index))
+    if (entry.kind === 'card') return { actor: STREET_AFTER_CARD[cardsDealt++], label: entry.card, onRewind }
+    return { actor: entry.actor, label: entry.label, color: entry.color, onRewind }
+  })
+}
+
+interface PostflopTableProps {
   spot: PostflopSpot
   hero: Hero
   node: NodeInfo
-  onPick: (entry: PathEntry) => void
-}) {
-  const aggregated = useMemo(() => (node.kind === 'player' ? aggregateNode(node) : null), [node])
+  path: PathEntry[]
+  /** いまのストリートの最初のノード。まだ取得していなければ undefined */
+  streetStart: NodeInfo | undefined
+  showFrequencies: boolean
+  onToggleFrequencies: () => void
+  onPath: (path: PathEntry[]) => void
+}
 
-  if (node.kind === 'chance') {
-    return (
-      <section className="card">
-        <header className="card-header">{node.board.length === 3 ? 'ターン' : 'リバー'}のカードを選ぶ</header>
-        <CardPicker
-          possibleCards={node.possibleCards}
-          onPick={(id) => onPick({ kind: 'card', choice: id, card: cardFromId(id) })}
-        />
-      </section>
-    )
+function PostflopTable({
+  spot,
+  hero,
+  node,
+  path,
+  streetStart,
+  showFrequencies,
+  onToggleFrequencies,
+  onPath,
+}: PostflopTableProps) {
+  const aggregated = useMemo(() => (node.kind === 'player' ? aggregateNode(node) : null), [node])
+  const actor = node.kind === 'player' ? (node.player === 0 ? spot.oop : spot.ip) : null
+  const startBets = streetStart?.bets ?? [0, 0]
+  const streetBets = [node.bets[0] - startBets[0], node.bets[1] - startBets[1]]
+  const streetActions = path.slice(path.findLastIndex((e) => e.kind === 'card') + 1)
+  const folded = streetActions.find((e) => e.kind === 'action' && e.label === 'Fold')
+
+  const seats: SeatView[] = seatsFromBottom(hero.position ?? spot.ip).map((position) => {
+    const side = position === spot.oop ? 0 : position === spot.ip ? 1 : null
+    const last = streetActions.findLast((e) => e.kind === 'action' && e.actor === position)
+    return {
+      position,
+      stack: side === null ? null : spot.effectiveStackBb - toBb(node.bets[side]),
+      bet: side === null ? 0 : toBb(streetBets[side]),
+      folded: side === null || (folded?.kind === 'action' && folded.actor === position),
+      acting: position === actor,
+      hero: position === hero.position,
+      cards: position === hero.position ? hero.cards : null,
+      lastAction: last?.kind === 'action' ? { label: last.label, color: last.color } : undefined,
+    }
+  })
+
+  const choose = (index: number) => {
+    if (!aggregated || !actor) return
+    const action = aggregated.strategy.actions[index]
+    onPath([...path, { kind: 'action', choice: index, actor, label: action.label, color: actionColor(action) }])
   }
+
+  return (
+    <section className="card table-card">
+      <PokerTable
+        seats={seats}
+        pot={toBb(node.pot - streetBets[0] - streetBets[1])}
+        board={displayBoard(node.board)}
+      />
+      {aggregated && actor ? (
+        <ActionBar
+          actor={actor}
+          strategy={aggregated.strategy}
+          showFrequencies={showFrequencies}
+          onToggleFrequencies={onToggleFrequencies}
+          heroHand={heroHandFor(hero, actor)}
+          onChoose={choose}
+        />
+      ) : node.kind === 'chance' ? (
+        <div className="action-bar">
+          <div className="action-bar-head">
+            <strong>{node.board.length === 3 ? 'ターン' : 'リバー'}のカードを選んでください</strong>
+          </div>
+          <CardPicker
+            possibleCards={node.possibleCards}
+            onPick={(id) => onPath([...path, { kind: 'card', choice: id, card: cardFromId(id) }])}
+          />
+        </div>
+      ) : (
+        <div className="action-bar">
+          <div className="action-bar-head">
+            <strong>{folded ? `${folded.kind === 'action' ? folded.actor : ''} がフォールドしてハンド終了` : 'ショーダウン'}</strong>
+          </div>
+          <div className="finished-actions">
+            <button className="btn" onClick={() => onPath(path.slice(0, -1))}>
+              1つ戻る
+            </button>
+            <button className="btn" onClick={() => onPath([])}>
+              フロップに戻る
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function NodeBody({ spot, hero, node }: { spot: PostflopSpot; hero: Hero; node: NodeInfo }) {
+  const aggregated = useMemo(() => (node.kind === 'player' ? aggregateNode(node) : null), [node])
   if (node.kind !== 'player' || !aggregated) return null
 
   const actor = node.player === 0 ? spot.oop : spot.ip

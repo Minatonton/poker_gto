@@ -4,7 +4,8 @@ import { BoardCards, PlayingCard } from '../postflop/Cards'
 
 export interface SeatView {
   position: Position
-  stack: number
+  /** null はこのハンドに参加していない席 */
+  stack: number | null
   /** 席の前に置かれたチップ（bb）。0 なら置かない */
   bet: number
   folded: boolean
@@ -71,7 +72,7 @@ export function PokerTable({ seats, pot, board, onSeatClick, center }: Props) {
                 {seat.position}
                 {seat.position === 'BTN' && <span className="dealer-button">D</span>}
               </span>
-              <span className="seat-stack num">{formatBb(seat.stack)}bb</span>
+              <span className="seat-stack num">{seat.stack === null ? 'フォールド' : `${formatBb(seat.stack)}bb`}</span>
             </span>
             {seat.lastAction && (
               <span className="seat-action" style={{ color: seat.lastAction.color }}>
