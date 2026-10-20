@@ -6,6 +6,7 @@ import { CalculatorsPage } from './pages/CalculatorsPage'
 import { PreflopPage } from './pages/PreflopPage'
 import { RangeDrillPage } from './pages/RangeDrillPage'
 import { ReviewPage } from './pages/ReviewPage'
+import { ToysPage } from './pages/ToysPage'
 import { loadReviews, newReview, saveReviews, type HandReview } from './review/reviews'
 import { formatPercent } from './components/actionColors'
 import { TrainerPage } from './pages/TrainerPage'
@@ -182,6 +183,10 @@ export default function App() {
             onChange={changeReviews}
             onOpen={openReview}
           />
+        </main>
+
+        <main className="page" hidden={page !== 'toys'}>
+          <ToysPage />
         </main>
 
         <main className="page" hidden={page !== 'calculators'}>
