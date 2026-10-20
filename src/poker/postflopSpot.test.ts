@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { spotFromWalk, toRangeNotation } from './postflopSpot'
+import { cash6max100bb } from '../data/cash6max100bb'
 import { walkPreflop, type PreflopSolution } from './preflop'
+import { choicesForLine } from './preflopLine'
 
 const solution: PreflopSolution = {
   name: 'test',
@@ -47,6 +49,31 @@ describe('spotFromWalk', () => {
     expect(spot.ipRange.get('QQ')).toBe(0.5)
     expect(spot.ipRange.get('KK')).toBe(0)
     expect(spot.oopRange.get('AA')).toBe(1)
+  })
+
+  it('スクイーズポットでは、降りたオープナーのチップもデッドマネーとしてポットに入る', () => {
+    const spot = spotFromWalk(
+      walkPreflop(cash6max100bb, choicesForLine(cash6max100bb, {
+        opener: 'CO',
+        responder: 'BTN',
+        response: 'call',
+        overcaller: 'BB',
+        overcallAction: 'raise',
+        openerReply: 'fold',
+        callerReply: 'call',
+      })),
+    )!
+    expect(spot.oop).toBe('BB')
+    expect(spot.ip).toBe('BTN')
+    expect(spot.potBb).toBe(2.5 + 12.5 + 12.5 + 0.5)
+  })
+
+  it('3人でフロップに進むラインではスポットを作らない', () => {
+    const walk = walkPreflop(
+      cash6max100bb,
+      choicesForLine(cash6max100bb, { opener: 'CO', responder: 'BTN', response: 'call', overcaller: 'BB', overcallAction: 'call' }),
+    )
+    expect(spotFromWalk(walk)).toBeNull()
   })
 
   it('フロップに進まないラインではスポットを作らない', () => {

@@ -58,6 +58,17 @@ describe('walkPreflop', () => {
     expect(walk.status === 'finished' && walk.result).toContain('未収録')
   })
 
+  it('2回目の判断では、1回目に選んだアクションの頻度がそのハンドの重みになる', () => {
+    const walk = walkPreflop(
+      { ...solution, rfi: { BTN: { raiseTo: 2.5, raise: 'AA, KK:0.5' } } },
+      ['raise', 'raise'],
+    )
+    if (walk.status !== 'deciding') throw new Error('判断ノードに到達していません')
+    expect(walk.strategy.weights?.get('AA')).toBe(1)
+    expect(walk.strategy.weights?.get('KK')).toBe(0.5)
+    expect(walk.strategy.weights?.get('72o')).toBe(0)
+  })
+
   it('選べないアクションを指定するとエラーになる', () => {
     expect(() => walkPreflop(solution, ['call'])).toThrow()
   })

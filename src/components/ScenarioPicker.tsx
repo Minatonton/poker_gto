@@ -16,7 +16,19 @@ export function ScenarioPicker({ solution, line, onChange }: Props) {
   const openers = POSITIONS.filter((p) => solution.rfi[p])
   const responders = line.opener ? POSITIONS.filter((p) => solution.vsOpen[line.opener!]?.[p]) : []
   const responseSpec = line.opener && line.responder ? solution.vsOpen[line.opener]?.[line.responder] : undefined
-  const hasReply = line.opener && line.responder ? Boolean(solution.vs3bet[line.opener]?.[line.responder]) : false
+  const raiser = line.response === 'raise' ? line.responder : line.overcallAction === 'raise' ? line.overcaller : undefined
+  const hasReply = line.opener && raiser ? Boolean(solution.vs3bet[line.opener]?.[raiser]) : false
+  const overcallers =
+    line.response === 'call' && line.responder
+      ? POSITIONS.slice(POSITIONS.indexOf(line.responder) + 1).filter((p) => solution.vsOpenCall?.[p])
+      : []
+  const overcallSpec = line.overcaller ? solution.vsOpenCall?.[line.overcaller] : undefined
+  const base = { opener: line.opener, responder: line.responder, response: line.response }
+  const replyOptions: { value: ActionKind; label: string }[] = [
+    { value: 'call', label: 'Call' },
+    { value: 'raise', label: '4Bet' },
+    { value: 'fold', label: 'Fold' },
+  ]
 
   return (
     <section className="card">
@@ -52,16 +64,39 @@ export function ScenarioPicker({ solution, line, onChange }: Props) {
             onChange={(response) => onChange({ opener: line.opener, responder: line.responder, response })}
           />
         )}
-        {line.response === 'raise' && hasReply && (
+        {overcallers.length > 0 && (
+          <Segmented<Position | 'none'>
+            label="さらに応じた人"
+            options={[{ value: 'none', label: 'なし' }, ...positionOptions(overcallers)]}
+            value={line.overcaller ?? 'none'}
+            onChange={(overcaller) => onChange(overcaller === 'none' ? base : { ...base, overcaller })}
+          />
+        )}
+        {overcallSpec && (
+          <Segmented<'call' | 'raise'>
+            label="そのアクション"
+            options={[
+              ...(overcallSpec.call ? [{ value: 'call' as const, label: 'Call' }] : []),
+              { value: 'raise', label: `Squeeze ${overcallSpec.raiseTo}bb` },
+            ]}
+            value={line.overcallAction}
+            onChange={(overcallAction) => onChange({ ...base, overcaller: line.overcaller, overcallAction })}
+          />
+        )}
+        {raiser && hasReply && (
           <Segmented<ActionKind>
             label={`${line.opener} の対応`}
-            options={[
-              { value: 'call', label: 'Call' },
-              { value: 'raise', label: '4Bet' },
-              { value: 'fold', label: 'Fold' },
-            ]}
+            options={replyOptions}
             value={line.openerReply}
             onChange={(openerReply) => onChange({ ...line, openerReply })}
+          />
+        )}
+        {line.overcallAction === 'raise' && line.openerReply && line.openerReply !== 'raise' && solution.callerVsSqueeze && (
+          <Segmented<ActionKind>
+            label={`${line.responder} の対応`}
+            options={replyOptions}
+            value={line.callerReply}
+            onChange={(callerReply) => onChange({ ...line, callerReply })}
           />
         )}
       </div>

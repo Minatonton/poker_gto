@@ -1,5 +1,5 @@
-import { ALL_HANDS, type HandClass } from './hands'
-import type { Position, Step, Walk } from './preflop'
+import type { HandClass } from './hands'
+import { rangeOfPosition, type Position, type Step, type Walk } from './preflop'
 
 const STARTING_STACK_BB = 100
 const BLINDS: Partial<Record<Position, number>> = { SB: 0.5, BB: 1 }
@@ -16,15 +16,10 @@ export interface PostflopSpot {
   effectiveStackBb: number
 }
 
-/** コールで終わったヘッズアップのプリフロップラインから、フロップ開始時のスポットを作る。 */
+/** 2人でフロップに進んだプリフロップラインから、フロップ開始時のスポットを作る。3人以上はソルバーが扱えない */
 export function spotFromWalk(walk: Walk): PostflopSpot | null {
-  if (walk.status !== 'finished') return null
-  const lastStep = walk.steps.findLast((step) => step.strategy !== null)
-  if (lastStep?.action.kind !== 'call') return null
-
-  const players = [...new Set(walk.steps.filter((s) => s.action.kind !== 'fold').map((s) => s.position))]
-  if (players.length !== 2) return null
-  const [oop, ip] = [...players].sort((a, b) => POSTFLOP_ORDER.indexOf(a) - POSTFLOP_ORDER.indexOf(b))
+  if (walk.status !== 'finished' || walk.flopPlayers.length !== 2) return null
+  const [oop, ip] = [...walk.flopPlayers].sort((a, b) => POSTFLOP_ORDER.indexOf(a) - POSTFLOP_ORDER.indexOf(b))
 
   const invested = investments(walk.steps)
   const potBb = Object.values(invested).reduce((sum, bb) => sum + bb, 0)
@@ -34,8 +29,8 @@ export function spotFromWalk(walk: Walk): PostflopSpot | null {
     name: `${oop} vs ${ip}（${raiseCount >= 2 ? '3ベットポット' : 'シングルレイズドポット'}）`,
     oop,
     ip,
-    oopRange: rangeOf(walk.steps, oop),
-    ipRange: rangeOf(walk.steps, ip),
+    oopRange: rangeOfPosition(walk.steps, oop),
+    ipRange: rangeOfPosition(walk.steps, ip),
     potBb,
     effectiveStackBb: STARTING_STACK_BB - (invested[oop] ?? 0),
   }
@@ -53,20 +48,6 @@ function investments(steps: Step[]): Partial<Record<Position, number>> {
     }
   }
   return invested
-}
-
-/** そのプレイヤーの各判断で、実際に選ばれたアクションの頻度を掛け合わせる */
-function rangeOf(steps: Step[], position: Position): Map<HandClass, number> {
-  const range = new Map<HandClass, number>(ALL_HANDS.map((hand) => [hand, 1]))
-  for (const step of steps) {
-    if (step.position !== position || step.strategy === null) continue
-    const actionIndex = step.strategy.actions.indexOf(step.action)
-    for (const hand of ALL_HANDS) {
-      const frequency = step.strategy.frequencies.get(hand)?.[actionIndex] ?? 0
-      range.set(hand, (range.get(hand) ?? 0) * frequency)
-    }
-  }
-  return range
 }
 
 /** postflop-solver が解釈できるレンジ表記 "AA,AKs:0.5,..." にする */

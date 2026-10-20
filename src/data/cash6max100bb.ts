@@ -10,6 +10,9 @@ const SB_OPEN = 3
 const IP_3BET = 7.5
 const OOP_3BET = 11
 const BB_VS_SB_3BET = 9
+/** オープン 2.5bb とコール 1 人に対するスクイーズ。オープンの3倍にコール分を足す */
+const IP_SQUEEZE = 10
+const OOP_SQUEEZE = 12.5
 
 const rfi: PreflopSolution['rfi'] = {
   UTG: {
@@ -183,6 +186,43 @@ const vs3betTemplates: Record<Exclude<Position, 'BB'>, Vs3betTemplate> = {
   },
 }
 
+/*
+ * オープンに誰かがコールした後の応答。オープナーのポジションによる違いは小さいため、
+ * 応答する人のポジションだけで持っている。
+ */
+const vsOpenCall: PreflopSolution['vsOpenCall'] = {
+  CO: {
+    raiseTo: IP_SQUEEZE,
+    raise: 'QQ+, AKs, AKo:0.5, A5s:0.5',
+    call: 'JJ-66, AQs-AJs, KQs, QJs, JTs, T9s:0.5, AKo:0.5',
+  },
+  BTN: {
+    raiseTo: IP_SQUEEZE,
+    raise: 'QQ+, JJ:0.5, AKs, AKo, A5s:0.5, A4s:0.5',
+    call: 'JJ:0.5, TT-22, AQs-ATs, KQs, KJs, QJs, JTs, T9s, 98s, 87s, 76s:0.5, AQo:0.5',
+  },
+  SB: {
+    raiseTo: OOP_SQUEEZE,
+    raise: 'TT+, AQs+, AKo, AQo:0.5, A5s, A4s:0.5, KQs:0.5',
+    call: '99-66:0.5, AJs:0.5, KJs:0.5, QJs:0.5, JTs:0.5',
+  },
+  BB: {
+    raiseTo: OOP_SQUEEZE,
+    raise: 'JJ+, AKs, AQs:0.5, AKo, A5s:0.5, A4s:0.5',
+    call: 'TT-22, AQs:0.5, AJs-A6s, A3s, A2s, A5s:0.5, A4s:0.5, KTs+, K9s-K6s, QTs+, Q9s, J9s+, T8s+, 97s+, 86s+, 75s+, 64s+, 54s, AQo-ATo, KQo, KJo:0.5, QJo:0.5',
+  },
+}
+
+/**
+ * コールした後にスクイーズされた人の対応。オープンにフラットした時点で最強のハンドは3ベットに回っているため、
+ * 中くらいのペアとスーテッドのブロードウェイを中心に守る
+ */
+const callerVsSqueeze: SpotSpec = {
+  raiseTo: 26,
+  raise: 'QQ+:0.5, AQs:0.25, A5s:0.25',
+  call: 'QQ:0.5, JJ-77, AQs:0.75, AJs-ATs, KQs, KJs, QJs, JTs, T9s, 98s:0.5',
+}
+
 const BLINDS: readonly Position[] = ['SB', 'BB']
 
 function buildVs3bet(): PreflopSolution['vs3bet'] {
@@ -204,4 +244,6 @@ export const cash6max100bb: PreflopSolution = {
   rfi,
   vsOpen,
   vs3bet: buildVs3bet(),
+  vsOpenCall,
+  callerVsSqueeze,
 }
