@@ -33,6 +33,7 @@
   --action-fold: #4a7fd1;
   --cell-empty: #1f2126;
   --cell-dimmed: #2b2e35;
+  --range-fill: #7a808c;
 
   --suit-c: #2f9e5b;
   --suit-d: #2f6fd0;
@@ -1073,4 +1074,165 @@ button.action-row:hover {
 
 .legend-line.dashed {
   border-top: 2px dashed var(--label);
+}
+
+/* ---------- 計算機 ---------- */
+
+.calc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.calc-wide {
+  grid-column: span 2;
+}
+
+@media (max-width: 900px) {
+  .calc-wide {
+    grid-column: auto;
+  }
+}
+
+.calc-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.field-triple {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.field-triple input,
+.field-pair input,
+.field-pair select {
+  width: 100%;
+}
+
+.number-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+select,
+textarea {
+  font: inherit;
+  font-size: 13px;
+  color: inherit;
+  background: var(--surface);
+  border: 1px solid var(--input-line);
+  border-radius: var(--radius-sm);
+}
+
+select {
+  height: 34px;
+  padding: 0 8px;
+}
+
+textarea {
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.calc-results {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  border-top: 1px solid var(--mist);
+}
+
+.calc-results div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 2px 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--mist);
+}
+
+.calc-results dt {
+  font-size: 13px;
+  color: var(--sub);
+}
+
+.calc-results dd {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.calc-results p {
+  grid-column: 1 / -1;
+}
+
+.plain-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.plain-table th,
+.plain-table td {
+  padding: 7px 4px;
+  text-align: left;
+  border-bottom: 1px solid var(--mist);
+}
+
+.plain-table th {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--label);
+}
+
+.plain-table .num {
+  text-align: right;
+}
+
+.equity-calc {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 20px;
+}
+
+@media (max-width: 900px) {
+  .equity-calc {
+    grid-template-columns: 1fr;
+  }
+}
+
+.mini-grid .range-grid {
+  width: 100%;
+  min-width: 0;
+}
+
+.mini-grid .range-cell {
+  padding: 1px 2px;
+  font-size: 8px;
+}
+
+.verdict {
+  padding: 10px 12px;
+  font-size: 13px;
+  border-left: 3px solid;
+  background: var(--bg-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.verdict.good {
+  border-color: var(--action-call);
+}
+
+.verdict.bad {
+  border-color: var(--action-raise);
+}
+
+.board-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }

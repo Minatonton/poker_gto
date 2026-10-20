@@ -19,19 +19,20 @@ export function cardToId(card: string): number {
 
 /** "As Kd 7c" や "AsKd7c" を ['As', 'Kd', '7c'] にする */
 export function parseBoard(text: string): string[] {
-  const cards = parseCards(text)
+  const cards = parseCardList(text)
   if (cards.length < 3 || cards.length > 5) throw new Error('ボードは3〜5枚で指定してください')
   return cards
 }
 
 /** "Ah Kh" や "ahkh" を ['Ah', 'Kh'] にする */
 export function parseHoleCards(text: string): [string, string] {
-  const cards = parseCards(text)
+  const cards = parseCardList(text)
   if (cards.length !== 2) throw new Error('手札は2枚で指定してください（例: AhKh）')
   return [cards[0], cards[1]]
 }
 
-function parseCards(text: string): string[] {
+/** 枚数を問わずにカードを並べたものを解釈する。空なら空配列 */
+export function parseCardList(text: string): string[] {
   const compact = text.replace(/[\s,]/g, '')
   if (compact.length % 2 !== 0) throw new Error(`カードを解釈できません: ${text}`)
   const cards = Array.from({ length: compact.length / 2 }, (_, i) => {

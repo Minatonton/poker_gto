@@ -3,8 +3,12 @@ import type { Strategy } from '../poker/strategy'
 import type { HandStats } from '../solver/aggregate'
 import { actionColor } from './actionColors'
 
-/** グリッドの色で何を表すか。EV と EQ はソルブ結果のときだけ選べる */
-export type GridMode = 'strategy' | 'ev' | 'equity'
+/**
+ * グリッドの色で何を表すか。EV と EQ はソルブ結果のときだけ選べる。
+ * range は最初のアクションの頻度だけを無彩色で塗る。アクションのないレンジを見せるときに、
+ * 赤や青がアクションの意味に読まれてしまわないようにするため
+ */
+export type GridMode = 'strategy' | 'ev' | 'equity' | 'range'
 
 interface Props {
   strategy: Strategy
@@ -37,11 +41,14 @@ export function RangeGrid({
   return (
     <div className="range-grid" onMouseLeave={() => onHover(null)}>
       {HAND_GRID.flat().map((hand) => {
-        const weight = strategy.weights?.get(hand) ?? 1
+        const weight =
+          mode === 'range' ? (strategy.frequencies.get(hand)?.[0] ?? 0) : (strategy.weights?.get(hand) ?? 1)
         const labelOnBackground = weight < LABEL_ON_FILL_MIN_WEIGHT
         const handStats = stats?.get(hand)
         const background =
-          mode === 'strategy' || !handStats
+          mode === 'range'
+            ? 'var(--range-fill)'
+            : mode === 'strategy' || !handStats
             ? strategyBackground(strategy, hand, focusedAction)
             : heatColor(mode === 'equity' ? handStats.equity : handStats.ev / potBb)
         return (
@@ -56,7 +63,7 @@ export function RangeGrid({
             <span className="range-fill" style={{ height: `${weight * 100}%`, background }} />
             <span className="range-label">
               {hand}
-              {mode !== 'strategy' && handStats && (
+              {(mode === 'ev' || mode === 'equity') && handStats && (
                 <span className="range-value">
                   {mode === 'equity' ? Math.round(handStats.equity * 100) : handStats.ev.toFixed(1)}
                 </span>

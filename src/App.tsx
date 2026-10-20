@@ -1,42 +1,14 @@
 import { useMemo, useState } from 'react'
-import { ActionPath } from './components/ActionPath'
-import { HeroPanel } from './components/HeroPanel'
+import { NAV, type Page } from './app/navigation'
 import { PostflopView } from './components/postflop/PostflopView'
-import { ScenarioPicker } from './components/ScenarioPicker'
-import { StudyView } from './components/StudyView'
 import { cash6max100bb } from './data/cash6max100bb'
-import { heroHandFor, parseHero, type HeroInput } from './poker/hero'
-import { spotFromWalk, type PostflopSpot } from './poker/postflopSpot'
+import { CalculatorsPage } from './pages/CalculatorsPage'
+import { PreflopPage } from './pages/PreflopPage'
+import { parseHero, type HeroInput } from './poker/hero'
+import type { PostflopSpot } from './poker/postflopSpot'
 import { walkPreflop } from './poker/preflop'
 import { choicesForLine, lineOfWalk, type PreflopLine } from './poker/preflopLine'
 import type { ActionKind } from './poker/strategy'
-
-type Page = 'preflop' | 'postflop'
-
-const NAV: { page: Page; label: string; icon: React.ReactNode }[] = [
-  {
-    page: 'preflop',
-    label: 'プリフロップ',
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <rect x="2.5" y="2.5" width="13" height="13" rx="1.5" />
-        <path d="M2.5 7h13M2.5 11h13M7 2.5v13M11 2.5v13" />
-      </svg>
-    ),
-  },
-  {
-    page: 'postflop',
-    label: 'ポストフロップ',
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <rect x="1.5" y="4" width="4.5" height="6.5" rx="1" />
-        <rect x="6.75" y="4" width="4.5" height="6.5" rx="1" />
-        <rect x="12" y="4" width="4.5" height="6.5" rx="1" />
-        <path d="M3 14h12" />
-      </svg>
-    ),
-  },
-]
 
 export default function App() {
   const [page, setPage] = useState<Page>('preflop')
@@ -48,14 +20,13 @@ export default function App() {
   const [pickedLine, setPickedLine] = useState<PreflopLine | null>(null)
 
   const walk = useMemo(() => walkPreflop(cash6max100bb, choices), [choices])
-  const spotAtFlop = useMemo(() => spotFromWalk(walk), [walk])
   const line = useMemo(() => pickedLine ?? lineOfWalk(walk), [pickedLine, walk])
+  const hero = useMemo(() => parseHero(heroInput), [heroInput])
+
   const navigate = (next: ActionKind[]) => {
     setPickedLine(null)
     setChoices(next)
   }
-  const hero = useMemo(() => parseHero(heroInput), [heroInput])
-  const heroHand = walk.status === 'deciding' ? heroHandFor(hero, walk.position) : null
 
   const solveSpot = (spot: PostflopSpot) => {
     setPostflopSpot((current) => ({ id: (current?.id ?? 0) + 1, spot }))
@@ -84,6 +55,23 @@ export default function App() {
           ))}
         </nav>
 
+        <main className="page" hidden={page !== 'preflop'}>
+          <PreflopPage
+            walk={walk}
+            choices={choices}
+            line={line}
+            onLine={(next) => {
+              setPickedLine(next)
+              setChoices(choicesForLine(cash6max100bb, next))
+            }}
+            onNavigate={navigate}
+            heroInput={heroInput}
+            hero={hero}
+            onHeroInput={setHeroInput}
+            onSolveSpot={solveSpot}
+          />
+        </main>
+
         {/* ソルブ結果を保つため、ページを切り替えてもポストフロップ画面はアンマウントしない */}
         <main className="page" hidden={page !== 'postflop'}>
           <div className="page-header">
@@ -102,52 +90,8 @@ export default function App() {
           )}
         </main>
 
-        <main className="page" hidden={page !== 'preflop'}>
-          <div className="page-header">
-            <h1>プリフロップ</h1>
-            <span className="caption">一般的なレンジをもとにした近似値です。ソルバーの出力ではありません。</span>
-          </div>
-
-          <div className="setup-row">
-            <ScenarioPicker
-              solution={cash6max100bb}
-              line={line}
-              onChange={(next) => {
-                setPickedLine(next)
-                setChoices(choicesForLine(cash6max100bb, next))
-              }}
-            />
-            <HeroPanel input={heroInput} hero={hero} onChange={setHeroInput} />
-          </div>
-
-          <section className="card">
-            <ActionPath
-              walk={walk}
-              onRewind={(count) => navigate(choices.slice(0, count))}
-              onChoose={(kind) => navigate([...choices, kind])}
-            />
-          </section>
-
-          {walk.status === 'deciding' ? (
-            <StudyView key={`${choices.join()}-${heroHand}`} strategy={walk.strategy} heroHand={heroHand} />
-          ) : (
-            <section className="card empty-state">
-              <p>{walk.result}</p>
-              <div className="finished-actions">
-                {spotAtFlop && (
-                  <button className="btn primary" onClick={() => solveSpot(spotAtFlop)}>
-                    このスポットをソルブする
-                  </button>
-                )}
-                <button className="btn" onClick={() => navigate(choices.slice(0, -1))}>
-                  1つ戻る
-                </button>
-                <button className="btn" onClick={() => navigate([])}>
-                  最初から
-                </button>
-              </div>
-            </section>
-          )}
+        <main className="page" hidden={page !== 'calculators'}>
+          <CalculatorsPage hero={hero} />
         </main>
       </div>
     </>
