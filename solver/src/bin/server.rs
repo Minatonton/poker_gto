@@ -2,7 +2,7 @@
 //! ブラウザ内の WASM で動かさないのは、スレッドが使えず 4GiB のメモリ上限もあり、
 //! フロップからのソルブにはネイティブのマルチスレッドより一桁以上時間がかかるため。
 
-use poker_gto_solver::{Session, SolveOptions, SpotConfig};
+use poker_gto_solver::{Report, Session, SolveOptions, SpotConfig};
 use serde::Deserialize;
 use std::io::Read;
 use tiny_http::{Header, Method, Request, Response, Server};
@@ -20,6 +20,20 @@ struct SolveRequest {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ReportRequest {
+    config: SpotConfig,
+    boards: Vec<String>,
+    options: SolveOptions,
+}
+
+/// 単発のソルブと集合分析は、どちらも数 GiB のメモリを使うため同時には動かさない
+struct Jobs {
+    session: Session,
+    report: Report,
+}
+
+#[derive(Deserialize)]
 struct NodeRequest {
     history: Vec<usize>,
 }
@@ -29,7 +43,8 @@ fn main() {
         .ok()
         .and_then(|v| v.parse::<f64>().ok())
         .unwrap_or(DEFAULT_MAX_MEMORY_GIB);
-    let session = Session::new((max_memory_gib * (1u64 << 30) as f64) as u64);
+    let max_memory_bytes = (max_memory_gib * (1u64 << 30) as f64) as u64;
+    let jobs = Jobs { session: Session::new(max_memory_bytes), report: Report::new(max_memory_bytes) };
 
     // 外部から接続されないよう、ループバックアドレスだけで待ち受ける
     let server = Server::http(ADDRESS).expect("サーバーを起動できません");
@@ -37,7 +52,7 @@ fn main() {
 
     for mut request in server.incoming_requests() {
         // 想定外の panic で、ソルブ中の状態ごとサーバーが落ちないようにする
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| handle(&session, &mut request)))
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| handle(&jobs, &mut request)))
             .unwrap_or_else(|_| Err((500, "サーバー内部でエラーが発生しました".into())));
         let response = match result {
             Ok(body) => Response::from_string(body).with_status_code(200),
@@ -73,7 +88,8 @@ fn reject_foreign(request: &Request) -> Result<(), (u16, String)> {
     Ok(())
 }
 
-fn handle(session: &Session, request: &mut Request) -> Result<String, (u16, String)> {
+fn handle(jobs: &Jobs, request: &mut Request) -> Result<String, (u16, String)> {
+    let session = &jobs.session;
     let bad_request = |e: String| (400, e);
     if *request.method() != Method::Options {
         reject_foreign(request)?;
@@ -82,6 +98,9 @@ fn handle(session: &Session, request: &mut Request) -> Result<String, (u16, Stri
         (Method::Options, _) => Ok(String::new()),
         (Method::Get, "/status") => Ok(serde_json::to_string(&session.status()).unwrap()),
         (Method::Post, "/solve") => {
+            if jobs.report.is_running() {
+                return Err(bad_request("集合分析を実行中です。終わるか中断してからソルブしてください".into()));
+            }
             let body: SolveRequest = read_json(request).map_err(bad_request)?;
             session.start(&body.config, body.options).map_err(bad_request)?;
             Ok("{}".into())
@@ -94,6 +113,19 @@ fn handle(session: &Session, request: &mut Request) -> Result<String, (u16, Stri
             let body: NodeRequest = read_json(request).map_err(bad_request)?;
             let node = session.node(&body.history).map_err(bad_request)?;
             Ok(serde_json::to_string(&node).unwrap())
+        }
+        (Method::Get, "/report") => Ok(serde_json::to_string(&jobs.report.status()).unwrap()),
+        (Method::Post, "/report") => {
+            if session.is_solving() {
+                return Err(bad_request("ソルブ中です。終わるか中断してから集合分析を始めてください".into()));
+            }
+            let body: ReportRequest = read_json(request).map_err(bad_request)?;
+            jobs.report.start(body.config, body.boards, body.options).map_err(bad_request)?;
+            Ok("{}".into())
+        }
+        (Method::Post, "/report/stop") => {
+            jobs.report.stop();
+            Ok("{}".into())
         }
         _ => Err((404, "Not Found".into())),
     }

@@ -5,6 +5,7 @@ import { cashSolution, MAX_PLAYERS, MIN_PLAYERS } from './data/cashSolutions'
 import { CalculatorsPage } from './pages/CalculatorsPage'
 import { PreflopPage } from './pages/PreflopPage'
 import { RangeDrillPage } from './pages/RangeDrillPage'
+import { ReportPage } from './pages/ReportPage'
 import { ReviewPage } from './pages/ReviewPage'
 import { ToysPage } from './pages/ToysPage'
 import { loadReviews, newReview, saveReviews, type HandReview } from './review/reviews'
@@ -165,6 +166,10 @@ export default function App() {
               </button>
             </section>
           )}
+        </main>
+
+        <main className="page" hidden={page !== 'report'}>
+          <ReportPage spot={postflopSpot?.spot ?? null} onOpenPreflop={() => setPage('preflop')} />
         </main>
 
         <main className="page" hidden={page !== 'trainer'}>

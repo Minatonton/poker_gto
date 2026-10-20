@@ -47,6 +47,10 @@ impl Session {
         }
     }
 
+    pub fn is_solving(&self) -> bool {
+        matches!(self.status(), Status::Solving { .. })
+    }
+
     pub fn status(&self) -> Status {
         self.status.lock().unwrap().clone()
     }
@@ -68,18 +72,7 @@ impl Session {
         }
         *self.solved.lock().unwrap() = None;
 
-        let mut game = build_game(config)?;
-        let (raw, compressed_size) = game.memory_usage();
-        let compressed = raw > self.max_memory_bytes;
-        let memory_bytes = if compressed { compressed_size } else { raw };
-        if memory_bytes > self.max_memory_bytes {
-            return Err(format!(
-                "必要メモリが {:.2}GiB で上限 {:.2}GiB を超えています。ベットサイズを減らしてください",
-                gib(memory_bytes),
-                gib(self.max_memory_bytes)
-            ));
-        }
-        game.allocate_memory(compressed);
+        let (mut game, memory_bytes, compressed) = prepare_game(config, self.max_memory_bytes)?;
 
         self.stop_requested.store(false, Ordering::SeqCst);
         *self.status.lock().unwrap() =
@@ -89,34 +82,60 @@ impl Session {
         let solved = Arc::clone(&self.solved);
         let stop_requested = Arc::clone(&self.stop_requested);
         thread::spawn(move || {
-            let mut iteration = 0;
-            let mut exploitability = f32::INFINITY;
-            while iteration < options.max_iterations && !stop_requested.load(Ordering::SeqCst) {
-                let steps = ITERATIONS_PER_CHECK.min(options.max_iterations - iteration);
-                for _ in 0..steps {
-                    if stop_requested.load(Ordering::SeqCst) {
-                        break;
-                    }
-                    solve_step(&game, iteration);
-                    iteration += 1;
-                }
-                exploitability = compute_exploitability(&game);
-                *status.lock().unwrap() = Status::Solving {
-                    memory_bytes,
-                    compressed,
-                    iteration,
-                    exploitability: Some(exploitability),
-                };
-                if exploitability <= options.target_exploitability {
-                    break;
-                }
-            }
+            let (iteration, exploitability) = run_cfr(&game, &options, &stop_requested, |iteration, exploitability| {
+                *status.lock().unwrap() =
+                    Status::Solving { memory_bytes, compressed, iteration, exploitability: Some(exploitability) };
+            });
             finalize(&mut game);
             *solved.lock().unwrap() = Some(game);
             *status.lock().unwrap() = Status::Solved { iteration, exploitability };
         });
         Ok(())
     }
+}
+
+/// ゲームツリーを作り、メモリの上限に収まるように確保する。収まらなければ 16bit に圧縮して確保する
+pub(crate) fn prepare_game(config: &SpotConfig, max_memory_bytes: u64) -> Result<(PostFlopGame, u64, bool), String> {
+    let mut game = build_game(config)?;
+    let (raw, compressed_size) = game.memory_usage();
+    let compressed = raw > max_memory_bytes;
+    let memory_bytes = if compressed { compressed_size } else { raw };
+    if memory_bytes > max_memory_bytes {
+        return Err(format!(
+            "必要メモリが {:.2}GiB で上限 {:.2}GiB を超えています。ベットサイズを減らしてください",
+            gib(memory_bytes),
+            gib(max_memory_bytes)
+        ));
+    }
+    game.allocate_memory(compressed);
+    Ok((game, memory_bytes, compressed))
+}
+
+/// 目標の exploitability か最大反復回数に達するか、中断されるまで CFR を進める。戻り値は (反復回数, exploitability)
+pub(crate) fn run_cfr(
+    game: &PostFlopGame,
+    options: &SolveOptions,
+    stop_requested: &AtomicBool,
+    mut on_progress: impl FnMut(u32, f32),
+) -> (u32, f32) {
+    let mut iteration = 0;
+    let mut exploitability = f32::INFINITY;
+    while iteration < options.max_iterations && !stop_requested.load(Ordering::SeqCst) {
+        let steps = ITERATIONS_PER_CHECK.min(options.max_iterations - iteration);
+        for _ in 0..steps {
+            if stop_requested.load(Ordering::SeqCst) {
+                break;
+            }
+            solve_step(game, iteration);
+            iteration += 1;
+        }
+        exploitability = compute_exploitability(game);
+        on_progress(iteration, exploitability);
+        if exploitability <= options.target_exploitability {
+            break;
+        }
+    }
+    (iteration, exploitability)
 }
 
 fn gib(bytes: u64) -> f64 {

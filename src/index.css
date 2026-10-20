@@ -1977,3 +1977,34 @@ textarea {
 .graph-point {
   fill: var(--accent);
 }
+
+/* ---------- 集合分析 ---------- */
+
+.report-table {
+  margin: 0 16px 16px;
+  width: calc(100% - 32px);
+}
+
+.report-table .playing-card {
+  width: 24px;
+  height: 32px;
+  font-size: 12px;
+}
+
+.report-table td:nth-child(5),
+.report-table td:nth-child(7) {
+  width: 18%;
+}
+
+.average-row td {
+  font-weight: 700;
+  background: var(--bg-subtle);
+}
+
+.sort-button {
+  padding: 0;
+  font-size: 11px;
+  color: var(--label);
+  background: transparent;
+  border: none;
+}

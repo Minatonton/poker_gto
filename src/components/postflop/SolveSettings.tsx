@@ -1,17 +1,15 @@
 import { useState } from 'react'
 import { displayBoard, parseBoard, randomFlop } from '../../poker/cards'
 import type { PostflopSpot } from '../../poker/postflopSpot'
-import { toRangeNotation } from '../../poker/postflopSpot'
-import { CHIPS_PER_BB, type SolveOptions, type SpotConfig, type StreetSizes } from '../../solver/types'
+import { spotConfig, type Street, type StreetSizeOptions } from '../../solver/spotConfig'
+import { CHIPS_PER_BB, type SolveOptions, type SpotConfig } from '../../solver/types'
 import { BoardCards } from './Cards'
-
-type Street = 'flop' | 'turn' | 'river'
 
 /**
  * ベットサイズを1つ増やすごとに後続のツリーが掛け算で増える。
  * 全ストリート2サイズにすると SRP でも10GiB を超え、ソルブに数十分かかるため、ターン以降は1サイズにしている。
  */
-const DEFAULT_SIZES: Record<Street, { bet: string; raise: string }> = {
+const DEFAULT_SIZES: StreetSizeOptions = {
   flop: { bet: '33%, 75%', raise: '3x' },
   turn: { bet: '75%', raise: '3x' },
   river: { bet: '75%', raise: '3x' },
@@ -45,24 +43,10 @@ export function SolveSettings({ spot, heroCards, disabled, onSolve }: Props) {
   const submit = () => {
     if (!board) return
     const startingPot = Math.round(spot.potBb * CHIPS_PER_BB)
-    const sameForBoth = (street: Street): StreetSizes => ({ oop: sizes[street], ip: sizes[street] })
-    onSolve(
-      {
-        oopRange: toRangeNotation(spot.oopRange),
-        ipRange: toRangeNotation(spot.ipRange),
-        board: board.join(''),
-        startingPot,
-        effectiveStack: Math.round(spot.effectiveStackBb * CHIPS_PER_BB),
-        rakeRate: 0,
-        rakeCap: 0,
-        flop: sameForBoth('flop'),
-        turn: sameForBoth('turn'),
-        river: sameForBoth('river'),
-        addAllinThreshold: 1.5,
-        forceAllinThreshold: 0.15,
-      },
-      { maxIterations, targetExploitability: (startingPot * targetPercent) / 100 },
-    )
+    onSolve(spotConfig(spot, board.join(''), sizes), {
+      maxIterations,
+      targetExploitability: (startingPot * targetPercent) / 100,
+    })
   }
 
   return (

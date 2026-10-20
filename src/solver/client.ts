@@ -1,4 +1,4 @@
-import type { NodeInfo, SolveOptions, SolverStatus, SpotConfig } from './types'
+import type { NodeInfo, ReportStatus, SolveOptions, SolverStatus, SpotConfig } from './types'
 
 /** solver/src/bin/server.rs が待ち受けるアドレス */
 const SERVER_URL = 'http://127.0.0.1:8787'
@@ -33,6 +33,19 @@ export class SolverClient {
 
   node(history: number[]): Promise<NodeInfo> {
     return this.request('/node', { history })
+  }
+
+  /** 同じスポットを複数のフロップで順に解く（集合分析）。進み具合は reportStatus で確かめる */
+  async startReport(config: SpotConfig, boards: string[], options: SolveOptions) {
+    await this.request('/report', { config, boards, options })
+  }
+
+  reportStatus(): Promise<ReportStatus> {
+    return this.request('/report')
+  }
+
+  async stopReport() {
+    await this.request('/report/stop', {})
   }
 
   dispose() {

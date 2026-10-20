@@ -1,7 +1,7 @@
 use postflop_solver::{Action, PostFlopGame, card_to_string, holes_to_strings};
 use serde::Serialize;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ActionInfo {
     /// "fold" | "check" | "call" | "bet" | "raise" | "allin"
@@ -39,7 +39,7 @@ pub struct OpponentHand {
     pub equity: f32,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RangeSummary {
     /// このノードに到達するコンボ数

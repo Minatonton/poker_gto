@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-export type Page = 'preflop' | 'postflop' | 'calculators' | 'trainer' | 'drill' | 'review' | 'toys'
+export type Page = 'preflop' | 'postflop' | 'calculators' | 'trainer' | 'drill' | 'review' | 'toys' | 'report'
 
 const icon = (children: ReactNode) => (
   <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
@@ -28,6 +28,15 @@ export const NAV: { page: Page; label: string; icon: ReactNode }[] = [
         <rect x="6.75" y="4" width="4.5" height="6.5" rx="1" />
         <rect x="12" y="4" width="4.5" height="6.5" rx="1" />
         <path d="M3 14h12" />
+      </>,
+    ),
+  },
+  {
+    page: 'report',
+    label: '集合分析',
+    icon: icon(
+      <>
+        <path d="M3 15V9M7 15V5M11 15V8M15 15V3" />
       </>,
     ),
   },

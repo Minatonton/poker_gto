@@ -1,4 +1,4 @@
-// solver/src/spot.rs・node.rs・session.rs の JSON と揃えている
+// solver/src/spot.rs・node.rs・session.rs・report.rs の JSON と揃えている
 
 /** postflop-solver はチップを整数で扱うため、0.01bb 単位にしている */
 export const CHIPS_PER_BB = 100
@@ -93,3 +93,26 @@ export type SolverStatus =
   | { state: 'idle' }
   | { state: 'solving'; memoryBytes: number; compressed: boolean; iteration: number; exploitability: number | null }
   | { state: 'solved'; iteration: number; exploitability: number }
+
+export interface StrategySummary {
+  actions: SolverAction[]
+  frequencies: number[]
+}
+
+export interface ReportRow {
+  board: string
+  iteration: number
+  exploitability: number
+  /** [OOP, IP] */
+  ranges: [RangeSummary, RangeSummary]
+  oop: StrategySummary
+  ipAfterCheck: StrategySummary | null
+}
+
+export interface ReportStatus {
+  state: 'idle' | 'running' | 'done'
+  total: number
+  current: string | null
+  rows: ReportRow[]
+  failures: { board: string; message: string }[]
+}
