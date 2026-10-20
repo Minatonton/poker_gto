@@ -6,10 +6,9 @@ import { preflopSeats } from '../components/table/preflopSeats'
 import { Segmented } from '../components/Segmented'
 import { StudyView } from '../components/StudyView'
 import { cash6max100bb } from '../data/cash6max100bb'
-import { cardFromId, displayBoard, isSameHoleCards } from '../poker/cards'
-import { POSITIONS, type Position } from '../poker/preflop'
+import { cardFromId, cardToId, displayBoard, isSameHoleCards } from '../poker/cards'
+import { POSITIONS, rangeOfPosition, type Position } from '../poker/preflop'
 import type { PostflopSpot } from '../poker/postflopSpot'
-import { seatsFromBottom } from '../poker/table'
 import type { Action } from '../poker/strategy'
 import { toActions, toBb } from '../solver/aggregate'
 import { SolverClient } from '../solver/client'
@@ -17,6 +16,11 @@ import type { NodeInfo } from '../solver/types'
 import { GRADES, actionForRng, gradeByEv, gradeByFrequency, type Grade } from '../trainer/grading'
 import { dealNextCard, dealPostflopHands, villainAction } from '../trainer/postflopHand'
 import { createPreflopQuestion, PREFLOP_DRILLS, type PreflopDrillKind, type PreflopQuestion } from '../trainer/preflopDrill'
+import { explainPostflop, explainPreflop } from '../trainer/explain'
+import { equityVsRange } from '../poker/equity'
+import { seatsFromBottom, tableState } from '../poker/table'
+import { classifyHand } from '../poker/handCategory'
+import { breakdownNode } from '../solver/breakdown'
 
 type Mode = 'preflop' | 'postflop'
 type Stats = Record<Grade, number>
@@ -121,7 +125,7 @@ function PreflopTrainer({ useRng, onGrade }: { useRng: boolean; onGrade: (grade:
   const [seat, setSeat] = useState<Position | 'random'>('random')
   const [question, setQuestion] = useState<PreflopQuestion | null>(null)
   const [rng, setRng] = useState(rollRng)
-  const [answer, setAnswer] = useState<{ chosen: number; grade: Grade } | null>(null)
+  const [answer, setAnswer] = useState<{ chosen: number; grade: Grade; explanation: string[] } | null>(null)
   const [error, setError] = useState('')
   const [showRange, setShowRange] = useState(false)
 
@@ -147,7 +151,7 @@ function PreflopTrainer({ useRng, onGrade }: { useRng: boolean; onGrade: (grade:
   const choose = (index: number) => {
     if (!question || answer) return
     const grade = gradeByFrequency(frequencies, index, useRng ? rng : undefined)
-    setAnswer({ chosen: index, grade })
+    setAnswer({ chosen: index, grade, explanation: preflopExplanation(question, frequencies, index) })
     onGrade(grade)
   }
 
@@ -199,6 +203,7 @@ function PreflopTrainer({ useRng, onGrade }: { useRng: boolean; onGrade: (grade:
               frequencies={frequencies}
               chosen={answer.chosen}
               rngAction={useRng ? actionForRng(frequencies, rng) : undefined}
+              explanation={answer.explanation}
               onNext={() => next()}
               extra={
                 <button className="btn" onClick={() => setShowRange(!showRange)}>
@@ -215,6 +220,40 @@ function PreflopTrainer({ useRng, onGrade }: { useRng: boolean; onGrade: (grade:
       )}
     </>
   )
+}
+
+/**
+ * プリフロップの説明に必要な数字を集める。相手は最後にレイズした人で、
+ * その人がここまでに選んだアクションの頻度をレンジの重みにして EQ を求める
+ */
+function preflopExplanation(question: PreflopQuestion, frequencies: number[], chosen: number): string[] {
+  const { walk, hand, cards } = question
+  const hero = walk.position
+  const lastRaise = walk.steps.findLast((s) => s.action.kind === 'raise' && s.position !== hero)
+  const playersBehind = POSITIONS.length - 1 - POSITIONS.indexOf(hero)
+  if (!lastRaise) {
+    return explainPreflop({ hand, actions: walk.strategy.actions, frequencies, chosen, playersBehind })
+  }
+  const state = tableState(walk.steps)
+  const toCall = state.currentBet - state.seats[hero].invested
+  let equity: number | undefined
+  try {
+    const ids = cards.map(cardToId) as [number, number]
+    equity = equityVsRange(ids, [], rangeOfPosition(walk.steps, lastRaise.position), 3000).equity
+  } catch {
+    equity = undefined
+  }
+  return explainPreflop({
+    hand,
+    actions: walk.strategy.actions,
+    frequencies,
+    chosen,
+    equity,
+    toCall,
+    potBeforeCall: state.pot,
+    aggressor: lastRaise.position,
+    playersBehind,
+  })
 }
 
 function PreflopQuestionTable({ question }: { question: PreflopQuestion }) {
@@ -287,6 +326,7 @@ function Feedback({
   onNext,
   nextLabel = '次の問題',
   extra,
+  explanation,
 }: {
   grade: Grade
   actions: Action[]
@@ -298,6 +338,8 @@ function Feedback({
   onNext: () => void
   nextLabel?: string
   extra?: React.ReactNode
+  /** なぜそのアクションが正解なのかの説明 */
+  explanation?: string[]
 }) {
   const info = GRADES.find((g) => g.grade === grade)!
   return (
@@ -327,6 +369,16 @@ function Feedback({
           </li>
         ))}
       </ul>
+      {explanation && explanation.length > 0 && (
+        <div className="explanation">
+          <strong>{grade === 'best' ? '解説' : 'なぜ別のアクションを選ぶべきか'}</strong>
+          <ul>
+            {explanation.map((line, i) => (
+              <li key={i}>{line}</li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div className="finished-actions">
         <button className="btn primary" onClick={onNext}>
           {nextLabel}
@@ -391,7 +443,9 @@ function PostflopTrainer({
   const clientRef = useRef(new SolverClient())
   const [sideChoice, setSideChoice] = useState<'oop' | 'ip' | 'random'>('random')
   const [hand, setHand] = useState<HandState | null>(null)
-  const [answer, setAnswer] = useState<{ chosen: number; grade: Grade; evLoss: number } | null>(null)
+  const [answer, setAnswer] = useState<{ chosen: number; grade: Grade; evLoss: number; explanation: string[] } | null>(
+    null,
+  )
   const [rng, setRng] = useState(rollRng)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -450,7 +504,23 @@ function PostflopTrainer({
     const result = evAvailable
       ? gradeByEv(heroCombo.strategy, evs, index, toBb(heroNode.pot), roll)
       : { grade: gradeByFrequency(heroCombo.strategy, index, roll), evLoss: 0 }
-    setAnswer({ chosen: index, ...result })
+    const heroSide = hand!.heroSide
+    const villainSide = heroSide === 0 ? 1 : 0
+    const made = classifyHand(hand!.hero.map(cardToId) as [number, number], heroNode.board.map(cardToId)).made
+    const categoryRow = breakdownNode(heroNode).made.find((row) => row.label === made)
+    const explanation = explainPostflop({
+      cards: hand!.hero,
+      board: heroNode.board,
+      actions,
+      frequencies: heroCombo.strategy,
+      evs,
+      chosen: index,
+      equity: heroCombo.equity ?? 0,
+      toCall: Math.max(0, toBb(heroNode.bets[villainSide] - heroNode.bets[heroSide])),
+      pot: toBb(heroNode.pot),
+      categoryFrequencies: categoryRow?.frequencies,
+    })
+    setAnswer({ chosen: index, ...result, explanation })
     onGrade(result.grade)
   }
 
@@ -540,6 +610,7 @@ function PostflopTrainer({
                   evLoss={answer.evLoss}
                   chosen={answer.chosen}
                   rngAction={useRng ? actionForRng(heroCombo.strategy, rng) : undefined}
+                  explanation={answer.explanation}
                   onNext={proceed}
                   nextLabel="続ける"
                 />
