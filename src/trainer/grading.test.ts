@@ -30,7 +30,7 @@ describe('actionForRng', () => {
 })
 
 describe('gradeByEv', () => {
-  const frequencies = [0.6, 0.4, 0]
+  const frequencies = [0.98, 0.01, 0.01]
 
   it('EV の損失がポットの1%以内なら Correct', () => {
     expect(gradeByEv(frequencies, [10, 9.95, 0], 1, 10).grade).toBe('correct')
@@ -40,6 +40,10 @@ describe('gradeByEv', () => {
     expect(gradeByEv(frequencies, [10, 9.8, 0], 1, 10).grade).toBe('inaccuracy')
     expect(gradeByEv(frequencies, [10, 9.5, 0], 1, 10).grade).toBe('wrong')
     expect(gradeByEv(frequencies, [10, 9, 0], 2, 10).grade).toBe('blunder')
+  })
+
+  it('GTO がそれなりの頻度で選ぶアクションは、EV の誤差が大きくても頻度の評価を下回らない', () => {
+    expect(gradeByEv([0.6, 0.4], [10, 9], 1, 10).grade).toBe('correct')
   })
 
   it('EV の損失を返す', () => {

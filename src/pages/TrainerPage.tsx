@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { actionColor, formatPercent } from '../components/actionColors'
 import { BoardCards, PlayingCard } from '../components/postflop/Cards'
+import { PokerTable, type SeatView } from '../components/table/PokerTable'
+import { preflopSeats } from '../components/table/preflopSeats'
 import { Segmented } from '../components/Segmented'
 import { StudyView } from '../components/StudyView'
 import { cash6max100bb } from '../data/cash6max100bb'
 import { cardFromId, displayBoard, isSameHoleCards } from '../poker/cards'
 import { POSITIONS, type Position } from '../poker/preflop'
 import type { PostflopSpot } from '../poker/postflopSpot'
+import { seatsFromBottom } from '../poker/table'
 import type { Action } from '../poker/strategy'
 import { toActions, toBb } from '../solver/aggregate'
 import { SolverClient } from '../solver/client'
@@ -180,20 +183,10 @@ function PreflopTrainer({ useRng, onGrade }: { useRng: boolean; onGrade: (grade:
       )}
 
       {question && (
-        <section className="card">
-          <div className="action-line">
-            {question.walk.steps
-              .filter((s) => s.strategy !== null)
-              .map((step, index) => (
-                <span key={index} className="step static" style={{ '--action': actionColor(step.action) } as React.CSSProperties}>
-                  <span className="step-actor">{step.position}</span>
-                  <span className="step-action">{step.action.label}</span>
-                </span>
-              ))}
-          </div>
+        <section className="card table-card">
+          <PreflopQuestionTable question={question} />
           <Question
             actor={question.walk.position}
-            cards={question.cards}
             actions={question.walk.strategy.actions}
             rng={useRng ? rng : undefined}
             answered={answer !== null}
@@ -224,6 +217,11 @@ function PreflopTrainer({ useRng, onGrade }: { useRng: boolean; onGrade: (grade:
   )
 }
 
+function PreflopQuestionTable({ question }: { question: PreflopQuestion }) {
+  const { seats, pot } = preflopSeats(question.walk.steps, question.walk.position, question.walk.position, question.cards)
+  return <PokerTable seats={seats} pot={pot} />
+}
+
 function Question({
   actor,
   cards,
@@ -234,7 +232,8 @@ function Question({
   onChoose,
 }: {
   actor: string
-  cards: [string, string]
+  /** 卓に手札とボードを出しているときは省く */
+  cards?: [string, string]
   board?: string[]
   actions: Action[]
   rng?: number
@@ -245,11 +244,13 @@ function Question({
     <div className="question">
       <div className="question-hand">
         <span className="muted small">{actor} の手番</span>
-        <span className="question-cards">
-          {cards.map((card) => (
-            <PlayingCard key={card} card={card} />
-          ))}
-        </span>
+        {cards && (
+          <span className="question-cards">
+            {cards.map((card) => (
+              <PlayingCard key={card} card={card} />
+            ))}
+          </span>
+        )}
         {board && board.length > 0 && (
           <span className="question-board">
             <span className="muted small">ボード</span>
@@ -506,7 +507,12 @@ function PostflopTrainer({
       )}
 
       {hand && (
-        <section className="card">
+        <section className="card table-card">
+          <PokerTable
+            seats={postflopSeats(spot, hand)}
+            pot={toBb(hand.node.pot)}
+            board={displayBoard(hand.node.board)}
+          />
           {hand.log.length > 0 && (
             <div className="action-line">
               {hand.log.map((entry, i) => (
@@ -519,9 +525,7 @@ function PostflopTrainer({
           {heroNode ? (
             <>
               <Question
-                actor={`${position(hand.heroSide)}（自分）・ポット ${toBb(heroNode.pot).toFixed(2)}bb`}
-                cards={hand.hero}
-                board={heroNode.board}
+                actor={`${position(hand.heroSide)}（自分）`}
                 actions={actions}
                 rng={useRng ? rng : undefined}
                 answered={answer !== null}
@@ -548,6 +552,25 @@ function PostflopTrainer({
       )}
     </>
   )
+}
+
+/** ポストフロップの卓。ハンドに参加している2人以外はフォールド済みとして並べ、ハンドが終わったら相手の手札も開く */
+function postflopSeats(spot: PostflopSpot, hand: HandState): SeatView[] {
+  const heroPosition = hand.heroSide === 0 ? spot.oop : spot.ip
+  const ended = hand.node.kind === 'terminal'
+  return seatsFromBottom(heroPosition).map((position) => {
+    const side = position === spot.oop ? 0 : position === spot.ip ? 1 : null
+    const acting = hand.node.kind === 'player' && side === hand.node.player
+    return {
+      position,
+      stack: side === null ? null : spot.effectiveStackBb - toBb(hand.node.bets[side]),
+      bet: 0,
+      folded: side === null,
+      acting,
+      hero: position === heroPosition,
+      cards: position === heroPosition ? hand.hero : side !== null && ended ? hand.villain : null,
+    }
+  })
 }
 
 /** 学習用なので、勝敗ではなく判断の採点だけを見せる。終わったハンドは両者の手札とボードの確認だけにする */

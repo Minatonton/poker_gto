@@ -46,7 +46,13 @@ const CORRECT_MAX_LOSS = 0.01
 const INACCURACY_MAX_LOSS = 0.03
 const WRONG_MAX_LOSS = 0.1
 
-/** EV の損失で採点する。頻度が最も高いアクションは、EV の差が誤差の範囲でも Best にする */
+const GRADE_ORDER: Grade[] = ['best', 'correct', 'inaccuracy', 'wrong', 'blunder']
+
+/**
+ * EV の損失で採点する。ただし GTO が実際に選ぶアクション（頻度3%以上）は、頻度での評価を下回らないようにする。
+ * 均衡では混ぜているアクション同士の EV は等しいが、反復の少ないソルブでは EV に誤差が残り、
+ * GTO がそれなりの頻度で選ぶアクションまで EV だけで Wrong になってしまうため
+ */
 export function gradeByEv(
   frequencies: readonly number[],
   evs: readonly number[],
@@ -55,11 +61,19 @@ export function gradeByEv(
   rng?: number,
 ): { grade: Grade; evLoss: number } {
   const evLoss = Math.max(0, Math.max(...evs) - evs[chosen])
-  const byFrequency = gradeByFrequency(frequencies, chosen, rng)
-  if (byFrequency === 'best') return { grade: 'best', evLoss }
   const lossRatio = evLoss / pot
-  if (lossRatio <= CORRECT_MAX_LOSS) return { grade: 'correct', evLoss }
-  if (lossRatio <= INACCURACY_MAX_LOSS) return { grade: 'inaccuracy', evLoss }
-  if (lossRatio <= WRONG_MAX_LOSS) return { grade: 'wrong', evLoss }
-  return { grade: 'blunder', evLoss }
+  const byEv: Grade =
+    lossRatio <= CORRECT_MAX_LOSS
+      ? 'correct'
+      : lossRatio <= INACCURACY_MAX_LOSS
+        ? 'inaccuracy'
+        : lossRatio <= WRONG_MAX_LOSS
+          ? 'wrong'
+          : 'blunder'
+  const byFrequency = gradeByFrequency(frequencies, chosen, rng)
+  const usedByGto = byFrequency === 'best' || frequencies[chosen] >= INACCURACY_MIN_FREQUENCY
+  const grade = usedByGto
+    ? GRADE_ORDER[Math.min(GRADE_ORDER.indexOf(byEv), GRADE_ORDER.indexOf(byFrequency))]
+    : byEv
+  return { grade, evLoss }
 }

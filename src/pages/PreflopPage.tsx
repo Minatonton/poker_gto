@@ -5,7 +5,8 @@ import { StudyView } from '../components/StudyView'
 import { ActionBar } from '../components/table/ActionBar'
 import { HandHistory, type HistoryEntry } from '../components/table/HandHistory'
 import { HoleCardPicker } from '../components/table/HoleCardPicker'
-import { PokerTable, type SeatView } from '../components/table/PokerTable'
+import { PokerTable } from '../components/table/PokerTable'
+import { preflopSeats } from '../components/table/preflopSeats'
 import { BoardCards } from '../components/postflop/Cards'
 import { cash6max100bb } from '../data/cash6max100bb'
 import { heroHandFor, type Hero, type HeroInput } from '../poker/hero'
@@ -13,7 +14,6 @@ import { spotFromWalk, type PostflopSpot } from '../poker/postflopSpot'
 import type { Position, Walk } from '../poker/preflop'
 import type { PreflopLine } from '../poker/preflopLine'
 import type { ActionKind } from '../poker/strategy'
-import { seatsFromBottom, tableState } from '../poker/table'
 
 interface Props {
   walk: Walk
@@ -44,24 +44,7 @@ export function PreflopPage({
   const spotAtFlop = spotFromWalk(walk)
   const actor = walk.status === 'deciding' ? walk.position : null
   const heroHand = actor ? heroHandFor(hero, actor) : null
-  const state = tableState(walk.steps)
-
-  const seats: SeatView[] = seatsFromBottom(hero.position ?? 'BTN').map((position) => {
-    const seat = state.seats[position]
-    return {
-      position,
-      stack: seat.stack,
-      bet: seat.invested,
-      folded: seat.folded,
-      acting: position === actor,
-      hero: position === hero.position,
-      cards: position === hero.position ? hero.cards : null,
-      lastAction:
-        seat.lastAction && !seat.autoFolded
-          ? { label: seat.lastAction.label, color: actionColor(seat.lastAction) }
-          : undefined,
-    }
-  })
+  const { seats, pot } = preflopSeats(walk.steps, actor, hero.position, hero.cards)
 
   let choiceCount = 0
   const history: HistoryEntry[] = walk.steps.map((step) => {
@@ -89,7 +72,7 @@ export function PreflopPage({
 
       <div className="table-layout">
         <section className="card table-card">
-          <PokerTable seats={seats} pot={state.pot} onSeatClick={toggleSeat} />
+          <PokerTable seats={seats} pot={pot} onSeatClick={toggleSeat} />
           {walk.status === 'deciding' ? (
             <ActionBar
               actor={walk.position}
