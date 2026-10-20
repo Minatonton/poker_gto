@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { formatPercent } from '../components/actionColors'
+import { formatPercent } from '../actionColors'
 import {
   akqBestResponses,
   akqBettorEv,
@@ -10,23 +10,7 @@ import {
   rpsEvs,
   type Hand,
   type Mix,
-} from '../toys/games'
-
-/** Amu 氏の note「GTOとは何か」「ポラライズ」「Geometric Betsize」で使われるトイゲームを触って確かめる */
-export function ToysPage() {
-  return (
-    <>
-      <div className="page-header">
-        <h1>トイゲーム</h1>
-        <span className="caption">単純なゲームで、GTO・搾取・ポラライズしたベットの考え方を数字で確かめます。</span>
-      </div>
-      <div className="calc-grid toys">
-        <RockPaperScissors />
-        <AkqGame />
-      </div>
-    </>
-  )
-}
+} from '../../toys/games'
 
 const percentInput = (value: number, onChange: (v: number) => void, label: string) => (
   <label className="field">
@@ -55,7 +39,7 @@ function setShare(mix: Mix, hand: Hand, value: number): Mix {
   return next
 }
 
-function RockPaperScissors() {
+export function RockPaperScissors() {
   const [opponent, setOpponent] = useState<Mix>({ rock: 0.4, paper: 0.3, scissors: 0.3 })
   const [mine, setMine] = useState<Mix>({ rock: 1 / 3, paper: 1 / 3, scissors: 1 / 3 })
   const evs = rpsEvs(opponent)
@@ -116,7 +100,7 @@ function RockPaperScissors() {
 const GRAPH = { width: 520, height: 200, padding: 36 }
 const MAX_BET = 4
 
-function AkqGame() {
+export function AkqGame() {
   const [pot, setPot] = useState(1)
   const [bet, setBet] = useState(1)
   const eq = akqEquilibrium(pot, bet)

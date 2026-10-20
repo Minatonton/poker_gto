@@ -1,26 +1,61 @@
 import { useMemo, useState } from 'react'
-import { NAV, type Page } from './app/navigation'
+import {
+  ANALYZE_VIEWS,
+  PRACTICE_VIEWS,
+  SECTIONS,
+  type AnalyzeView,
+  type HandStep,
+  type PracticeView,
+  type Section,
+} from './app/navigation'
+import { formatPercent } from './components/actionColors'
 import { PostflopView } from './components/postflop/PostflopView'
 import { cashSolution, MAX_PLAYERS, MIN_PLAYERS } from './data/cashSolutions'
-import { CalculatorsPage } from './pages/CalculatorsPage'
+import { LearnPage } from './pages/LearnPage'
 import { PreflopPage } from './pages/PreflopPage'
 import { RangeDrillPage } from './pages/RangeDrillPage'
 import { ReportPage } from './pages/ReportPage'
 import { ReviewPage } from './pages/ReviewPage'
-import { ToysPage } from './pages/ToysPage'
-import { loadReviews, newReview, saveReviews, type HandReview } from './review/reviews'
-import { formatPercent } from './components/actionColors'
 import { TrainerPage } from './pages/TrainerPage'
 import { parseHero, type HeroInput } from './poker/hero'
 import type { PostflopSpot } from './poker/postflopSpot'
 import { walkPreflop } from './poker/preflop'
 import { choicesForLine, lineOfWalk, type PreflopLine } from './poker/preflopLine'
 import type { ActionKind } from './poker/strategy'
+import { loadReviews, newReview, saveReviews, type HandReview } from './review/reviews'
 
 const PLAYER_COUNTS = Array.from({ length: MAX_PLAYERS - MIN_PLAYERS + 1 }, (_, i) => MIN_PLAYERS + i)
 
+function SubTabs<T extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: { value: T; label: string }[]
+  value: T
+  onChange: (value: T) => void
+}) {
+  return (
+    <div className="sub-tabs" role="tablist">
+      {options.map((option) => (
+        <button
+          key={option.value}
+          role="tab"
+          aria-selected={option.value === value}
+          onClick={() => onChange(option.value)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export default function App() {
-  const [page, setPage] = useState<Page>('preflop')
+  const [section, setSection] = useState<Section>('analyze')
+  const [analyzeView, setAnalyzeView] = useState<AnalyzeView>('hand')
+  const [handStep, setHandStep] = useState<HandStep>('preflop')
+  const [practiceView, setPracticeView] = useState<PracticeView>('trainer')
   const [players, setPlayers] = useState(6)
   const solution = useMemo(() => cashSolution(players), [players])
   const [choices, setChoices] = useState<ActionKind[]>([])
@@ -43,6 +78,7 @@ export default function App() {
     setPlayers(next)
     setChoices([])
     setPickedLine(null)
+    setHandStep('preflop')
     if (heroInput.position && !nextPositions.includes(heroInput.position)) {
       setHeroInput({ ...heroInput, position: null })
     }
@@ -78,7 +114,8 @@ export default function App() {
     })
     changeReviews([review, ...reviews])
     setSelectedReview(review.id)
-    setPage('review')
+    setSection('practice')
+    setPracticeView('review')
   }
 
   const openReview = (review: HandReview) => {
@@ -86,101 +123,127 @@ export default function App() {
     setPickedLine(null)
     setChoices(review.choices)
     setHeroInput({ position: review.heroPosition, cardsText: review.heroCards })
-    setPage('preflop')
+    setSection('analyze')
+    setAnalyzeView('hand')
+    setHandStep('preflop')
   }
 
   const solveSpot = (spot: PostflopSpot) => {
     setPostflopSpot((current) => ({ id: (current?.id ?? 0) + 1, spot }))
-    setPage('postflop')
+    setHandStep('postflop')
+  }
+
+  const openPreflop = () => {
+    setSection('analyze')
+    setAnalyzeView('hand')
+    setHandStep('preflop')
   }
 
   return (
     <>
       <header className="app-header">
         <span className="brand">Poker GTO</span>
+        <nav className="section-tabs" aria-label="画面">
+          {SECTIONS.map((item) => (
+            <button
+              key={item.section}
+              className="section-tab"
+              aria-current={section === item.section ? 'page' : undefined}
+              onClick={() => setSection(item.section)}
+            >
+              <span className="section-label">{item.label}</span>
+              <span className="section-description">{item.description}</span>
+            </button>
+          ))}
+        </nav>
         <label className="players-select">
           人数
           <select value={players} onChange={(e) => changePlayers(Number(e.target.value))}>
             {PLAYER_COUNTS.map((n) => (
               <option key={n} value={n}>
-                {n === 2 ? 'ヘッズアップ（2人）' : `${n}人`}
+                {n === 2 ? 'ヘッズアップ' : `${n}人`}
               </option>
             ))}
           </select>
         </label>
-        <span className="game-chip">{solution.name}</span>
       </header>
 
-      <div className="app-body">
-        <nav className="side-nav">
-          {NAV.map((item) => (
-            <button
-              key={item.page}
-              className="nav-item"
-              aria-current={page === item.page ? 'page' : undefined}
-              onClick={() => setPage(item.page)}
-            >
-              {item.icon}
-              {item.label}
-            </button>
-          ))}
-        </nav>
+      <main className="page" hidden={section !== 'analyze'}>
+        <SubTabs options={ANALYZE_VIEWS} value={analyzeView} onChange={setAnalyzeView} />
 
-        <main className="page" hidden={page !== 'preflop'}>
-          <PreflopPage
-            solution={solution}
-            walk={walk}
-            choices={choices}
-            line={line}
-            onLine={(next) => {
-              setPickedLine(next)
-              setChoices(choicesForLine(solution, next))
-            }}
-            onNavigate={navigate}
-            heroInput={heroInput}
-            hero={hero}
-            onHeroInput={setHeroInput}
-            onSolveSpot={solveSpot}
-            onRecord={recordHand}
-          />
-        </main>
-
-        {/* ソルブ結果を保つため、ページを切り替えてもポストフロップ画面はアンマウントしない */}
-        <main className="page" hidden={page !== 'postflop'}>
-          <div className="page-header">
-            <h1>ポストフロップ</h1>
-            {postflopSpot && <span className="caption">{postflopSpot.spot.name}</span>}
-          </div>
-          {postflopSpot ? (
-            <PostflopView
-              key={postflopSpot.id}
-              spot={postflopSpot.spot}
-              hero={hero}
-              onSolved={() => setSolvedSpot(postflopSpot.spot)}
-            />
-          ) : (
-            <section className="card empty-state">
-              <p>プリフロップでフロップまで進むラインを選ぶと、そのスポットをここでソルブできます。</p>
-              <button className="btn primary" onClick={() => setPage('preflop')}>
-                プリフロップでラインを選ぶ
+        <div hidden={analyzeView !== 'hand'} className="page-stack">
+          <ol className="steps" aria-label="分析の手順">
+            <li>
+              <button aria-current={handStep === 'preflop' ? 'step' : undefined} onClick={() => setHandStep('preflop')}>
+                <span className="step-number">1</span> プリフロップを入力
               </button>
-            </section>
-          )}
-        </main>
+            </li>
+            <li>
+              <button
+                aria-current={handStep === 'postflop' ? 'step' : undefined}
+                onClick={() => setHandStep('postflop')}
+                disabled={!postflopSpot}
+                title={postflopSpot ? undefined : 'プリフロップでフロップまで進むと選べます'}
+              >
+                <span className="step-number">2</span> フロップ以降をソルブ
+              </button>
+            </li>
+          </ol>
 
-        <main className="page" hidden={page !== 'report'}>
-          <ReportPage spot={postflopSpot?.spot ?? null} onOpenPreflop={() => setPage('preflop')} />
-        </main>
+          <div hidden={handStep !== 'preflop'} className="page-stack">
+            <PreflopPage
+              solution={solution}
+              walk={walk}
+              choices={choices}
+              line={line}
+              onLine={(next) => {
+                setPickedLine(next)
+                setChoices(choicesForLine(solution, next))
+              }}
+              onNavigate={navigate}
+              heroInput={heroInput}
+              hero={hero}
+              onHeroInput={setHeroInput}
+              onSolveSpot={solveSpot}
+              onRecord={recordHand}
+            />
+          </div>
 
-        <main className="page" hidden={page !== 'trainer'}>
-          <TrainerPage key={players} solution={solution} solvedSpot={solvedSpot} onOpenPostflop={() => setPage('postflop')} />
-        </main>
+          {/* ソルブ結果を保つため、手順を切り替えてもポストフロップの画面はアンマウントしない */}
+          <div hidden={handStep !== 'postflop'} className="page-stack">
+            {postflopSpot && (
+              <>
+                <div className="page-header">
+                  <h1>{postflopSpot.spot.name}</h1>
+                  <button className="btn small-btn" onClick={() => setHandStep('preflop')}>
+                    プリフロップに戻る
+                  </button>
+                </div>
+                <PostflopView
+                  key={postflopSpot.id}
+                  spot={postflopSpot.spot}
+                  hero={hero}
+                  onSolved={() => setSolvedSpot(postflopSpot.spot)}
+                />
+              </>
+            )}
+          </div>
+        </div>
 
-        <main className="page" hidden={page !== 'drill'}>
+        <div hidden={analyzeView !== 'compare'} className="page-stack">
+          <ReportPage spot={postflopSpot?.spot ?? null} onOpenPreflop={openPreflop} />
+        </div>
+      </main>
+
+      <main className="page" hidden={section !== 'practice'}>
+        <SubTabs options={PRACTICE_VIEWS} value={practiceView} onChange={setPracticeView} />
+        <div hidden={practiceView !== 'trainer'} className="page-stack">
+          <TrainerPage key={players} solution={solution} solvedSpot={solvedSpot} onOpenAnalyze={openPreflop} />
+        </div>
+        <div hidden={practiceView !== 'drill'} className="page-stack">
           <RangeDrillPage key={players} solution={solution} />
-        </main>
-
-        <main className="page" hidden={page !== 'review'}>
+        </div>
+        <div hidden={practiceView !== 'review'} className="page-stack">
           <ReviewPage
             reviews={reviews}
             selectedId={selectedReview}
@@ -188,16 +251,12 @@ export default function App() {
             onChange={changeReviews}
             onOpen={openReview}
           />
-        </main>
+        </div>
+      </main>
 
-        <main className="page" hidden={page !== 'toys'}>
-          <ToysPage />
-        </main>
-
-        <main className="page" hidden={page !== 'calculators'}>
-          <CalculatorsPage hero={hero} />
-        </main>
-      </div>
+      <main className="page" hidden={section !== 'learn'}>
+        <LearnPage />
+      </main>
     </>
   )
 }

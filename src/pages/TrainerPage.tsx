@@ -50,10 +50,10 @@ interface Props {
   solution: PreflopSolution
   /** ポストフロップで直近にソルブしたスポット */
   solvedSpot: PostflopSpot | null
-  onOpenPostflop: () => void
+  onOpenAnalyze: () => void
 }
 
-export function TrainerPage({ solution, solvedSpot, onOpenPostflop }: Props) {
+export function TrainerPage({ solution, solvedSpot, onOpenAnalyze }: Props) {
   const [mode, setMode] = useState<Mode>('preflop')
   const [useRng, setUseRng] = useState(false)
   const [stats, setStats] = useState(loadStats)
@@ -98,9 +98,9 @@ export function TrainerPage({ solution, solvedSpot, onOpenPostflop }: Props) {
             <PostflopTrainer spot={solvedSpot} useRng={useRng} onGrade={record} />
           ) : (
             <section className="card empty-state">
-              <p>ポストフロップの出題には、先にポストフロップ画面でスポットをソルブしてください。</p>
-              <button className="btn primary" onClick={onOpenPostflop}>
-                ポストフロップを開く
+              <p>ポストフロップの出題には、先に「分析」でフロップまで進み、そのスポットをソルブしてください。</p>
+              <button className="btn primary" onClick={onOpenAnalyze}>
+                分析を開く
               </button>
             </section>
           )}

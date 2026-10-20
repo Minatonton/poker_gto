@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { formatPercent } from '../components/actionColors'
-import { BoardCards } from '../components/postflop/Cards'
-import { RangeGrid } from '../components/RangeGrid'
-import { cardToId, parseCardList, parseHoleCards } from '../poker/cards'
-import { equityVsRange, type EquityResult } from '../poker/equity'
-import type { Hero } from '../poker/hero'
+import { formatPercent } from '../actionColors'
+import { BoardCards } from '../postflop/Cards'
+import { RangeGrid } from '../RangeGrid'
+import { cardToId, parseCardList, parseHoleCards } from '../../poker/cards'
+import { equityVsRange, type EquityResult } from '../../poker/equity'
+import type { Hero } from '../../poker/hero'
 import {
   bluffRatio,
   geometricBet,
@@ -15,30 +15,9 @@ import {
   requiredEquity,
   requiredEquityAgainstBet,
   ruleOfTwoAndFour,
-} from '../poker/math'
-import { parseRange } from '../poker/range'
-import { buildStrategy } from '../poker/strategy'
-
-export function CalculatorsPage({ hero }: { hero: Hero }) {
-  const [pot, setPot] = useState(22.5)
-  const [bet, setBet] = useState(20.25)
-
-  return (
-    <>
-      <div className="page-header">
-        <h1>計算機</h1>
-        <span className="caption">オッズ・必要勝率・アウツ・ジオメトリックベット・EQ を計算します。</span>
-      </div>
-      <div className="calc-grid">
-        <BetOddsCard pot={pot} bet={bet} onPot={setPot} onBet={setBet} />
-        <EquityCard hero={hero} required={requiredEquityAgainstBet(pot, bet)} />
-        <CallOddsCard />
-        <OutsCard />
-        <GeometricCard />
-      </div>
-    </>
-  )
-}
+} from '../../poker/math'
+import { parseRange } from '../../poker/range'
+import { buildStrategy } from '../../poker/strategy'
 
 function NumberField({
   label,
@@ -82,17 +61,9 @@ function Results({ rows }: { rows: { label: string; value: string; note?: string
 
 const valid = (...values: number[]) => values.every((v) => Number.isFinite(v) && v > 0)
 
-function BetOddsCard({
-  pot,
-  bet,
-  onPot,
-  onBet,
-}: {
-  pot: number
-  bet: number
-  onPot: (v: number) => void
-  onBet: (v: number) => void
-}) {
+export function BetOddsCard() {
+  const [pot, onPot] = useState(22.5)
+  const [bet, onBet] = useState(20.25)
   const ok = valid(pot, bet)
   return (
     <section className="card">
@@ -130,7 +101,7 @@ function BetOddsCard({
   )
 }
 
-function CallOddsCard() {
+export function CallOddsCard() {
   const [middle, setMiddle] = useState(14.75)
   const [toCall, setToCall] = useState(8.75)
   const ok = valid(middle, toCall)
@@ -158,7 +129,7 @@ function CallOddsCard() {
   )
 }
 
-function OutsCard() {
+export function OutsCard() {
   const [outs, setOuts] = useState(9)
   const [street, setStreet] = useState<'flop' | 'turn'>('flop')
   const cards = street === 'flop' ? 2 : 1
@@ -197,7 +168,7 @@ function OutsCard() {
   )
 }
 
-function GeometricCard() {
+export function GeometricCard() {
   const [pot, setPot] = useState(5.5)
   const [stack, setStack] = useState(97.5)
   const [streets, setStreets] = useState(3)
@@ -250,8 +221,11 @@ function GeometricCard() {
   )
 }
 
-function EquityCard({ hero, required }: { hero: Hero; required: number }) {
-  const [cardsText, setCardsText] = useState(hero.cards?.join('') ?? 'As5s')
+export function EquityCard({ hero }: { hero?: Hero }) {
+  const [cardsText, setCardsText] = useState(hero?.cards?.join('') ?? 'As5s')
+  const [pot, setPot] = useState(22.5)
+  const [bet, setBet] = useState(20.25)
+  const required = requiredEquityAgainstBet(pot, bet)
   const [boardText, setBoardText] = useState('Ks 9s 2d')
   const [rangeText, setRangeText] = useState('TT+, AJs+, KQs, AQo+, K9s, KTs, QJs, JTs, 99:0.5')
   const [result, setResult] = useState<EquityResult | null>(null)
@@ -292,6 +266,10 @@ function EquityCard({ hero, required }: { hero: Hero; required: number }) {
               <input value={boardText} onChange={(e) => setBoardText(e.target.value)} placeholder="Ks 9s 2d" />
             </label>
           </div>
+          <div className="field-pair">
+            <NumberField label="ベット前のポット" value={pot} onChange={setPot} suffix="bb" />
+            <NumberField label="相手のベット" value={bet} onChange={setBet} suffix="bb" />
+          </div>
           <label className="field">
             <span>相手のレンジ（例: TT+, AJs+, KQo, 99:0.5）</span>
             <textarea rows={3} value={rangeText} onChange={(e) => setRangeText(e.target.value)} />
@@ -306,7 +284,7 @@ function EquityCard({ hero, required }: { hero: Hero; required: number }) {
               <Results
                 rows={[
                   { label: 'EQ', value: formatPercent(result.equity), note: `勝ち ${formatPercent(result.win)}・引き分け ${formatPercent(result.tie)}（${result.samples.toLocaleString()} 回の試行）` },
-                  { label: '「ベットを受けたとき」の必要勝率', value: formatPercent(required) },
+                  { label: 'このベットへの必要勝率', value: formatPercent(required) },
                 ]}
               />
               <p className={result.equity > required ? 'verdict good' : 'verdict bad'}>

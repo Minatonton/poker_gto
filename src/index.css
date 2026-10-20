@@ -131,54 +131,12 @@ p {
   color: var(--ink);
 }
 
-.game-chip {
-  margin-left: auto;
-  font-size: 12px;
-  color: var(--label);
-}
 
-.app-body {
-  display: grid;
-  grid-template-columns: 224px minmax(0, 1fr);
-  min-height: calc(100vh - 60px);
-}
 
-.side-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 16px 12px;
-  background: var(--surface);
-  border-right: 1px solid var(--line);
-}
 
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 40px;
-  padding: 0 12px;
-  font-size: 14px;
-  text-align: left;
-  color: var(--sub);
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-sm);
-}
 
-.nav-item:hover {
-  background: var(--bg-subtle);
-}
 
-.nav-item[aria-current='page'] {
-  font-weight: 500;
-  color: var(--accent);
-  background: var(--selected);
-}
 
-.nav-item svg {
-  flex: none;
-}
 
 .page {
   display: flex;
@@ -205,22 +163,6 @@ p {
   color: var(--label);
 }
 
-@media (max-width: 900px) {
-  .app-body {
-    grid-template-columns: 1fr;
-  }
-
-  .side-nav {
-    flex-direction: row;
-    padding: 8px 12px;
-    border-right: none;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .page {
-    padding: 16px;
-  }
-}
 
 /* ---------- カード・ボタン・入力 ---------- */
 
@@ -2007,4 +1949,259 @@ textarea {
   color: var(--label);
   background: transparent;
   border: none;
+}
+
+/* ---------- 3つの入り口 ---------- */
+
+.app-header {
+  height: auto;
+  min-height: 64px;
+  gap: 28px;
+}
+
+.section-tabs {
+  display: flex;
+  align-self: stretch;
+  gap: 4px;
+}
+
+.section-tab {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  padding: 10px 18px 8px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+}
+
+.section-tab:hover {
+  background: var(--hover);
+}
+
+.section-tab[aria-current='page'] {
+  border-bottom-color: var(--accent);
+}
+
+.section-label {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--sub);
+}
+
+.section-tab[aria-current='page'] .section-label {
+  color: var(--ink);
+}
+
+.section-description {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.players-select {
+  margin-left: auto;
+}
+
+main.page {
+  max-width: 1680px;
+  margin: 0 auto;
+  padding: 20px 28px 48px;
+}
+
+.page-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.sub-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.sub-tabs button {
+  margin-bottom: -1px;
+  padding: 10px 16px;
+  font-size: 14px;
+  color: var(--sub);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+}
+
+.sub-tabs button[aria-selected='true'] {
+  font-weight: 700;
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+
+.steps {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.steps button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px 8px 8px;
+  font-size: 13px;
+  color: var(--sub);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.steps button[aria-current='step'] {
+  color: var(--ink);
+  border-color: var(--line-strong);
+  background: var(--selected);
+}
+
+.steps button:disabled {
+  color: var(--faint);
+  background: transparent;
+}
+
+.step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--on-accent);
+  background: var(--label);
+  border-radius: 999px;
+}
+
+.steps button[aria-current='step'] .step-number {
+  background: var(--accent);
+}
+
+@media (max-width: 900px) {
+  .section-description {
+    display: none;
+  }
+
+  .app-header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+}
+
+/* ---------- 教材 ---------- */
+
+.learn-layout {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 1000px) {
+  .learn-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.learn-toc {
+  position: sticky;
+  top: 80px;
+}
+
+.learn-toc ol {
+  margin: 0;
+  padding: 8px;
+  list-style: none;
+  counter-reset: chapter;
+}
+
+.learn-toc button {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+}
+
+.learn-toc button:hover {
+  background: var(--hover);
+}
+
+.learn-toc button[aria-current='page'] {
+  background: var(--selected);
+}
+
+.toc-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.toc-lead {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.learn-article {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.chapter-title {
+  font-size: 18px;
+}
+
+.chapter-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 820px;
+  font-size: 14px;
+  line-height: 1.9;
+  color: var(--body);
+}
+
+.chapter-body ul,
+.chapter-body ol {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding-left: 22px;
+}
+
+.chapter-body strong {
+  color: var(--ink);
+}
+
+.chapter-sources {
+  padding: 12px 16px;
+  font-size: 12px;
+  color: var(--muted);
+  border-top: 1px solid var(--mist);
+}
+
+.chapter-sources a {
+  color: var(--sub);
+}
+
+.tools-heading {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--label);
 }
