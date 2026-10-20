@@ -759,3 +759,147 @@ main.page {
 .reader .reading-example {
   background: var(--bg-subtle);
 }
+
+/* ---------- 勝率メーター ---------- */
+
+.equity-meter .card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.equity-meter .aside {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.meter-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.meter-label {
+  font-size: 13px;
+  color: var(--sub);
+}
+
+.meter-value {
+  font-size: 30px;
+  line-height: 1;
+  color: var(--ink);
+  animation: pop-in 0.3s ease-out both;
+}
+
+.meter-track {
+  position: relative;
+  height: 14px;
+  overflow: visible;
+  background: var(--mist);
+  border-radius: 999px;
+}
+
+.meter-fill {
+  display: block;
+  height: 100%;
+  background: var(--sub);
+  border-radius: 999px;
+  transition: width 0.5s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.meter-fill.enough {
+  background: var(--grade-best);
+}
+
+.meter-fill.short {
+  background: var(--grade-wrong);
+}
+
+/* 必要勝率の目盛り。バーの端を越えて伸ばし、目で当てやすくする */
+.meter-mark {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  background: var(--ink);
+  transform: translateX(-1px);
+}
+
+.meter-verdict {
+  font-size: 13px;
+}
+
+.meter-verdict.enough {
+  color: var(--grade-best);
+}
+
+.meter-verdict.short {
+  color: var(--grade-wrong);
+}
+
+.meter-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+}
+
+.meter-stats div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.meter-stats dt {
+  color: var(--sub);
+}
+
+.meter-stats dd {
+  margin: 0;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.meter-stats dd.plus {
+  color: var(--grade-best);
+}
+
+.meter-stats dd.minus {
+  color: var(--grade-wrong);
+}
+
+.equity-hint {
+  padding: 12px 14px;
+  font-size: 13px;
+  background: var(--bg-subtle);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-md);
+}
+
+.seat-badge {
+  position: absolute;
+  bottom: 14px;
+  left: calc(100% + 8px);
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--on-accent);
+  white-space: nowrap;
+  background: var(--accent);
+  border-radius: 999px;
+  animation: pop-in 0.3s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .meter-value,
+  .seat-badge {
+    animation: none;
+  }
+
+  .meter-fill {
+    transition: none;
+  }
+}

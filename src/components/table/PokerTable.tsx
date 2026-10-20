@@ -17,6 +17,8 @@ export interface SeatView {
   cards: [string, string] | null
   /** 直前のアクションの表示 */
   lastAction?: { label: string; color: string }
+  /** 席の下に添える短い数字（自分の EQ など） */
+  badge?: string
 }
 
 interface Props {
@@ -110,7 +112,9 @@ export function PokerTable({
         const { x, y } = seatPoint(slot, seats.length)
         return (
           <div key={seat.position} className="seat-slot" style={{ left: `${x}%`, top: `${y}%` }}>
-            <div className={`seat ${seat.folded ? 'folded' : ''} ${seat.acting ? 'acting' : ''} ${seat.hero ? 'hero' : ''}`}>
+            <div
+              className={`seat ${seat.folded ? 'folded' : ''} ${seat.acting ? 'acting' : ''} ${seat.hero ? 'hero' : ''}`}
+            >
               {!seat.folded && <SeatCards seat={seat} onHeroCardsClick={onHeroCardsClick} />}
               <button
                 type="button"
@@ -133,6 +137,11 @@ export function PokerTable({
                 </span>
               )}
               {seat.hero && <span className="seat-you">あなた</span>}
+              {seat.badge && (
+                <span key={seat.badge} className="seat-badge num">
+                  {seat.badge}
+                </span>
+              )}
             </div>
           </div>
         )

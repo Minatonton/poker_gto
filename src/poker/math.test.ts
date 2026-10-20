@@ -3,6 +3,8 @@ import {
   bluffRatio,
   geometricBet,
   hitProbability,
+  allInCallEv,
+  equityRealization,
   minimumDefenseFrequency,
   odds,
   requiredEquity,
@@ -65,5 +67,20 @@ describe('geometricBet', () => {
     const plan = geometricBet(5.5, 97.5, 3)
     const totalBet = plan.streets.reduce((sum, s) => sum + s.bet, 0)
     expect(totalBet).toBeCloseTo(97.5)
+  })
+})
+
+describe('コールの EV と EQR', () => {
+  it('ポット 100 に 50 のオールインを EQ 40% でコールすると、平均 10 得をする', () => {
+    expect(allInCallEv(100, 50, 0.4)).toBeCloseTo(10)
+  })
+
+  it('EQ がちょうど必要勝率なら、コールの EV は 0', () => {
+    expect(allInCallEv(100, 50, requiredEquity(100, 50))).toBeCloseTo(0)
+  })
+
+  it('EQR は EV を「EQ どおりにポットを取れた場合」で割った値で、EQ が 0 なら出さない', () => {
+    expect(equityRealization(30, 0.5, 100)).toBeCloseTo(0.6)
+    expect(equityRealization(0, 0, 100)).toBeNull()
   })
 })

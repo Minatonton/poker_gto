@@ -13,6 +13,9 @@ import type { Position, PreflopSolution, Walk } from '../../poker/preflop'
 import type { PreflopLine } from '../../poker/preflopLine'
 import { overallFrequencies, type ActionKind } from '../../poker/strategy'
 import { GameScreen, type DockTab } from '../../components/game/GameScreen'
+import { EquityMeter } from '../../components/table/EquityMeter'
+import { allInCallEv, requiredEquity } from '../../poker/math'
+import { usePreflopEquity, type PreflopEquity } from './usePreflopEquity'
 
 export interface PreflopHandProps {
   solution: PreflopSolution
@@ -34,7 +37,11 @@ export function PreflopHand(props: PreflopHandProps) {
 
   const actor = walk.status === 'deciding' ? walk.position : null
   const heroHand = actor ? heroHandFor(hero, actor) : null
+  const heroEquity = usePreflopEquity(walk, hero)
   const { seats, pot } = preflopSeats(walk.steps, walk.positions, actor, hero.position, hero.cards)
+  const tableSeats = seats.map((seat) =>
+    seat.hero && heroEquity?.equity != null ? { ...seat, badge: `EQ ${Math.round(heroEquity.equity * 100)}%` } : seat,
+  )
 
   const sit = (position: Position) =>
     onHeroInput({ ...heroInput, position: heroInput.position === position ? null : position })
@@ -74,6 +81,7 @@ export function PreflopHand(props: PreflopHandProps) {
             hidden={hidden}
             onToggleHidden={() => setHidden(!hidden)}
           />
+          <HeroEquity hero={hero} heroEquity={heroEquity} />
           {!hidden && <StudyView key={`${choices.join()}-${heroHand}`} strategy={walk.strategy} heroHand={heroHand} />}
         </>
       ) : (
@@ -115,7 +123,7 @@ export function PreflopHand(props: PreflopHandProps) {
       coach={coach}
       table={
         <PokerTable
-          seats={seats}
+          seats={tableSeats}
           pot={pot}
           onSeatClick={sit}
           onHeroCardsClick={() => setPicking(true)}
@@ -154,6 +162,37 @@ export function PreflopHand(props: PreflopHandProps) {
         )
       }
       tabs={[answerTab, historyTab, scenarioTab]}
+    />
+  )
+}
+
+/** 自分の手札の EQ と、コールするならその損得。座っていなければ、座ると何が分かるかを伝える */
+function HeroEquity({ hero, heroEquity }: { hero: Hero; heroEquity: PreflopEquity | null }) {
+  if (!hero.position || !hero.cards) {
+    return (
+      <p className="empty-note equity-hint">
+        卓の席に座って手札を選ぶと、あなたの EQ（勝率）と、コールしたときの EV を計算します。
+      </p>
+    )
+  }
+  if (!heroEquity) return null
+  const { opponent, pot, toCall, equity } = heroEquity
+  const facing = toCall > 0 && opponent !== null
+  return (
+    <EquityMeter
+      subject={`${hero.cards.join('')} vs ${opponent ? `${opponent} のレンジ` : 'ランダムな手'}`}
+      equity={equity}
+      required={facing ? requiredEquity(pot, toCall) : undefined}
+      callEv={
+        facing && equity !== null
+          ? { value: allInCallEv(pot, toCall, equity), note: 'オールインなら。実際は EQ を取りこぼす分だけ下がる' }
+          : undefined
+      }
+      note={
+        opponent
+          ? `${opponent} がここまでに選んだアクションの頻度を、レンジの重みにしています。`
+          : 'まだ誰もレイズしていないので、どの手とも同じ確率で当たるものとして比べています。'
+      }
     />
   )
 }

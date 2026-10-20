@@ -20,6 +20,9 @@ import type { NodeInfo, PlayerNode } from '../../solver/types'
 import { usePostflopSolve, type PathEntry } from '../../solver/usePostflopSolve'
 import { coachForSeat, preflopHistory } from './handHelpers'
 import { GameScreen, type DockTab } from '../../components/game/GameScreen'
+import { EquityMeter } from '../../components/table/EquityMeter'
+import { equityRealization, requiredEquity } from '../../poker/math'
+import type { Action } from '../../poker/strategy'
 
 /**
  * ベットサイズを1つ増やすごとに後続のツリーが掛け算で増える。
@@ -79,6 +82,8 @@ export function PostflopHand(props: PostflopHandProps) {
   ]
 
   const handAdvice = node?.kind === 'player' && actor ? adviceForHero(node, actor, hero) : undefined
+  const heroEquity =
+    node?.kind === 'player' && aggregated ? postflopHeroEquity(spot, node, aggregated.strategy.actions, hero) : null
 
   const advice = node?.kind === 'player' && aggregated && actor && (
     <>
@@ -91,6 +96,17 @@ export function PostflopHand(props: PostflopHandProps) {
         hidden={hidden}
         onToggleHidden={() => setHidden(!hidden)}
       />
+      {heroEquity && hero.cards && (
+        <EquityMeter
+          subject={`${hero.cards.join('')} vs ${heroEquity.opponent} のレンジ`}
+          equity={heroEquity.equity}
+          required={heroEquity.required}
+          callEv={heroEquity.callEv !== undefined ? { value: heroEquity.callEv, note: 'ソルバーの計算' } : undefined}
+          ev={heroEquity.ev}
+          eqr={heroEquity.eqr}
+          note="EV は、このノードから先にポットのうち取り戻せる見込みのチップです。"
+        />
+      )}
       {!hidden && (
         <StudyView
           key={solve.path.length}
@@ -203,7 +219,11 @@ export function PostflopHand(props: PostflopHandProps) {
       coach={<Coach phase={solve.phase.name} node={node} actor={actor} hero={hero} flopReady={flop.length === 3} />}
       table={
         <PokerTable
-          seats={postflopSeats(spot, node, solve.streetStart, solve.path, hero)}
+          seats={postflopSeats(spot, node, solve.streetStart, solve.path, hero).map((seat) =>
+            seat.hero && heroEquity?.equity != null
+              ? { ...seat, badge: `EQ ${Math.round(heroEquity.equity * 100)}%` }
+              : seat,
+          )}
           pot={tablePot(spot, node, solve.streetStart)}
           board={board}
           boardSlots={node ? (node.kind === 'chance' ? node.board.length + 1 : node.board.length) : 3}
@@ -563,5 +583,49 @@ function adviceForHero(node: PlayerNode, actor: string, hero: Hero): { advice?: 
       evs: combo.actionEvs.map((ev) => toBb(ev ?? 0)),
       equity: combo.equity ?? undefined,
     },
+  }
+}
+
+interface PostflopHeroEquity {
+  opponent: string
+  equity: number | null
+  ev?: number
+  eqr: number | null
+  required?: number
+  callEv?: number
+}
+
+/**
+ * 自分の2枚の EQ・EV・EQR。手番が相手のときも、相手から見た「相手のハンド」の側に自分の2枚が載っているので、そこから読む。
+ * 手番が自分で、相手のベットを受けているときだけ、必要勝率とソルバーが求めたコールの EV を添える
+ */
+function postflopHeroEquity(
+  spot: PostflopSpot,
+  node: PlayerNode,
+  actions: Action[],
+  hero: Hero,
+): PostflopHeroEquity | null {
+  if (!hero.cards || (hero.position !== spot.oop && hero.position !== spot.ip)) return null
+  const heroSide = hero.position === spot.oop ? 0 : 1
+  const cards = hero.cards.join('')
+  const mine = node.player === heroSide ? node.hands : node.opponentHands
+  const combo = mine.find((h) => isSameHoleCards(h.cards, cards))
+  if (!combo || combo.weight <= 0) return null
+  const potBb = toBb(node.pot)
+  const ev = combo.ev === null ? undefined : toBb(combo.ev)
+  const equity = combo.equity
+  const toCall = toBb(node.bets[1 - heroSide] - node.bets[heroSide])
+  const facing = node.player === heroSide && toCall > 0
+  const callIndex = actions.findIndex((a) => a.kind === 'call')
+  // ベットを受けているのは手番が自分のときなので、自分の2枚は node.hands にあり、アクションごとの EV を持つ
+  const actingCombo = facing ? node.hands.find((h) => isSameHoleCards(h.cards, cards)) : undefined
+  const callEv = callIndex >= 0 ? actingCombo?.actionEvs[callIndex] : null
+  return {
+    opponent: heroSide === 0 ? spot.ip : spot.oop,
+    equity,
+    ev,
+    eqr: ev !== undefined && equity !== null ? equityRealization(ev, equity, potBb) : null,
+    required: facing ? requiredEquity(potBb, toCall) : undefined,
+    callEv: callEv == null ? undefined : toBb(callEv),
   }
 }

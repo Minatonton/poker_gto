@@ -8,6 +8,19 @@ export function requiredEquity(potIncludingBets: number, toCall: number): number
   return toCall / (potIncludingBets + toCall)
 }
 
+/**
+ * オールインにコールしたときの EV（コールしなければ 0）。勝てばポット全体を取り、負ければコール額を失う。
+ * オールインでないときは後のストリートで EQ を取りこぼすため、この値は上限の目安になる
+ */
+export function allInCallEv(potIncludingBets: number, toCall: number, equity: number): number {
+  return equity * (potIncludingBets + toCall) - toCall
+}
+
+/** EQ のうち実際に取り戻せている割合。EV ÷ (EQ × ポット) */
+export function equityRealization(ev: number, equity: number, pot: number): number | null {
+  return equity > 0 && pot > 0 ? ev / (equity * pot) : null
+}
+
 /** ベット前のポットに対してベットされたときの必要勝率。bet ÷ (pot + bet + bet) */
 export function requiredEquityAgainstBet(pot: number, bet: number): number {
   return requiredEquity(pot + bet, bet)
