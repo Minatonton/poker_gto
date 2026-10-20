@@ -21,12 +21,15 @@ const STREET_LABELS: Record<Street, string> = { flop: 'フロップ', turn: 'タ
 
 interface Props {
   spot: PostflopSpot
+  /** ランダムなボードに自分の手札が出ないようにする */
+  heroCards: [string, string] | null
   disabled: boolean
   onSolve: (config: SpotConfig, options: SolveOptions) => void
 }
 
-export function SolveSettings({ spot, disabled, onSolve }: Props) {
-  const [boardText, setBoardText] = useState(() => randomFlop().join(' '))
+export function SolveSettings({ spot, heroCards, disabled, onSolve }: Props) {
+  const drawFlop = () => randomFlop(heroCards ?? []).join(' ')
+  const [boardText, setBoardText] = useState(drawFlop)
   const [sizes, setSizes] = useState(DEFAULT_SIZES)
   const [maxIterations, setMaxIterations] = useState(1000)
   const [targetPercent, setTargetPercent] = useState(0.5)
@@ -93,7 +96,7 @@ export function SolveSettings({ spot, disabled, onSolve }: Props) {
           <span>ボード</span>
           <div className="board-input">
             <input value={boardText} onChange={(e) => setBoardText(e.target.value)} placeholder="例: As Kd 7c" />
-            <button type="button" className="btn" onClick={() => setBoardText(randomFlop().join(' '))}>
+            <button type="button" className="btn" onClick={() => setBoardText(drawFlop())}>
               ランダム
             </button>
           </div>

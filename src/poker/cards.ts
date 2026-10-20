@@ -19,20 +19,40 @@ export function cardToId(card: string): number {
 
 /** "As Kd 7c" や "AsKd7c" を ['As', 'Kd', '7c'] にする */
 export function parseBoard(text: string): string[] {
+  const cards = parseCards(text)
+  if (cards.length < 3 || cards.length > 5) throw new Error('ボードは3〜5枚で指定してください')
+  return cards
+}
+
+/** "Ah Kh" や "ahkh" を ['Ah', 'Kh'] にする */
+export function parseHoleCards(text: string): [string, string] {
+  const cards = parseCards(text)
+  if (cards.length !== 2) throw new Error('手札は2枚で指定してください（例: AhKh）')
+  return [cards[0], cards[1]]
+}
+
+function parseCards(text: string): string[] {
   const compact = text.replace(/[\s,]/g, '')
-  if (compact.length % 2 !== 0) throw new Error(`ボードを解釈できません: ${text}`)
+  if (compact.length % 2 !== 0) throw new Error(`カードを解釈できません: ${text}`)
   const cards = Array.from({ length: compact.length / 2 }, (_, i) => {
     const card = compact.slice(i * 2, i * 2 + 2)
     return card[0].toUpperCase() + card[1].toLowerCase()
   })
   cards.forEach(cardToId)
-  if (cards.length < 3 || cards.length > 5) throw new Error('ボードは3〜5枚で指定してください')
   if (new Set(cards).size !== cards.length) throw new Error('同じカードが含まれています')
   return cards
 }
 
-export function randomFlop(random: () => number = Math.random): string[] {
-  const deck = Array.from({ length: 52 }, (_, id) => id)
+/** "AhKh" と "KhAh" のように並び順だけが違うホールカードを同じとみなす */
+export function isSameHoleCards(a: string, b: string): boolean {
+  const sorted = (cards: string) => [cards.slice(0, 2), cards.slice(2, 4)].sort().join('')
+  return sorted(a) === sorted(b)
+}
+
+/** excluded（自分の手札など）を除いたデッキから3枚を引く */
+export function randomFlop(excluded: readonly string[] = [], random: () => number = Math.random): string[] {
+  const excludedIds = new Set(excluded.map(cardToId))
+  const deck = Array.from({ length: 52 }, (_, id) => id).filter((id) => !excludedIds.has(id))
   for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1))
     ;[deck[i], deck[j]] = [deck[j], deck[i]]

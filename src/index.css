@@ -448,7 +448,7 @@ input:focus {
   grid-template-columns: repeat(13, minmax(0, 1fr));
   gap: 2px;
   /* ヘッダとアクションラインを除いた画面の高さに収め、スクロールせずに全体を見渡せるようにする */
-  width: min(100%, 720px, calc(100vh - 300px));
+  width: min(100%, 680px, max(460px, calc(100vh - 300px)));
   min-width: min(100%, 340px);
   margin: 0 auto;
   aspect-ratio: 1;
@@ -824,4 +824,129 @@ button.action-row:hover {
   * {
     transition: none !important;
   }
+}
+
+/* ---------- シチュエーションと自分の入力 ---------- */
+
+.setup-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(400px, 440px);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .setup-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.scenario {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.segmented-row {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.segmented-label {
+  font-size: 12px;
+  color: var(--label);
+}
+
+.segmented {
+  display: inline-flex;
+  width: fit-content;
+  overflow: hidden;
+  border: 1px solid var(--input-line);
+  border-radius: var(--radius-sm);
+}
+
+.segmented button {
+  min-width: 44px;
+  height: 32px;
+  padding: 0 10px;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--body);
+  background: #fff;
+  border: none;
+}
+
+.segmented button + button {
+  border-left: 1px solid var(--input-line);
+}
+
+.segmented button:hover {
+  background: #f2f4f7;
+}
+
+.segmented button[aria-checked='true'] {
+  font-weight: 500;
+  color: #fff;
+  background: var(--brand);
+}
+
+.btn.small-btn {
+  height: 26px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.card-header .aside-btn {
+  margin-left: auto;
+}
+
+.hero-cards {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hero-cards input {
+  width: 120px;
+}
+
+.study-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.hero-card {
+  border-color: #cbd3f2;
+}
+
+.hero-card .card-header {
+  color: var(--brand);
+  background: var(--brand-tint);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+
+.hero-card .playing-card {
+  width: 24px;
+  height: 32px;
+  font-size: 13px;
+}
+
+.range-cell.hero {
+  outline: 3px solid var(--brand);
+  outline-offset: -2px;
+  z-index: 2;
+}
+
+.hero-mark {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 7px;
+  height: 7px;
+  background: #fff;
+  border: 2px solid var(--brand);
+  border-radius: 999px;
 }

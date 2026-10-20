@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { cardFromId, displayBoard } from '../../poker/cards'
+import { cardFromId, displayBoard, isSameHoleCards } from '../../poker/cards'
+import { heroHandFor, type Hero } from '../../poker/hero'
 import type { PostflopSpot } from '../../poker/postflopSpot'
-import { aggregateNode, toBb } from '../../solver/aggregate'
+import { aggregateNode, toActions, toBb } from '../../solver/aggregate'
 import { SolverClient, type SolvedStatus } from '../../solver/client'
-import type { NodeInfo, SolveOptions, SolverStatus, SpotConfig } from '../../solver/types'
+import type { NodeInfo, PlayerNode, SolveOptions, SolverStatus, SpotConfig } from '../../solver/types'
 import { actionColor, formatPercent } from '../actionColors'
 import { DecisionBar } from '../DecisionBar'
 import { StudyView } from '../StudyView'
@@ -24,7 +25,7 @@ type PathEntry =
   | { kind: 'action'; choice: number; actor: string; label: string; color: string }
   | { kind: 'card'; choice: number; card: string }
 
-export function PostflopView({ spot }: { spot: PostflopSpot }) {
+export function PostflopView({ spot, hero }: { spot: PostflopSpot; hero: Hero }) {
   const clientRef = useRef<SolverClient | null>(null)
   const [phase, setPhase] = useState<Phase>({ name: 'setup' })
   const [error, setError] = useState('')
@@ -66,7 +67,7 @@ export function PostflopView({ spot }: { spot: PostflopSpot }) {
   return (
     <div className="postflop">
       <div className="postflop-side">
-        <SolveSettings spot={spot} disabled={phase.name === 'solving'} onSolve={solve} />
+        <SolveSettings spot={spot} heroCards={hero.cards} disabled={phase.name === 'solving'} onSolve={solve} />
         {phase.name === 'solved' && (
           <section className="card">
             <header className="card-header">
@@ -96,7 +97,13 @@ export function PostflopView({ spot }: { spot: PostflopSpot }) {
               </div>
               <PostflopPath spot={spot} node={node} path={path} onPath={setPath} />
             </section>
-            <NodeBody key={path.length} node={node} onPick={(entry) => setPath([...path, entry])} />
+            <NodeBody
+              key={path.length}
+              spot={spot}
+              hero={hero}
+              node={node}
+              onPick={(entry) => setPath([...path, entry])}
+            />
           </>
         ) : phase.name === 'solving' ? (
           <SolvingStatus phase={phase} onStop={() => clientRef.current?.stop()} />
@@ -204,7 +211,17 @@ function PostflopPath({
   )
 }
 
-function NodeBody({ node, onPick }: { node: NodeInfo; onPick: (entry: PathEntry) => void }) {
+function NodeBody({
+  spot,
+  hero,
+  node,
+  onPick,
+}: {
+  spot: PostflopSpot
+  hero: Hero
+  node: NodeInfo
+  onPick: (entry: PathEntry) => void
+}) {
   const aggregated = useMemo(() => (node.kind === 'player' ? aggregateNode(node) : null), [node])
 
   if (node.kind === 'chance') {
@@ -218,6 +235,66 @@ function NodeBody({ node, onPick }: { node: NodeInfo; onPick: (entry: PathEntry)
       </section>
     )
   }
-  if (!aggregated) return null
-  return <StudyView strategy={aggregated.strategy} stats={aggregated.stats} />
+  if (node.kind !== 'player' || !aggregated) return null
+
+  const actor = node.player === 0 ? spot.oop : spot.ip
+  const heroHand = heroHandFor(hero, actor)
+  return (
+    <StudyView
+      strategy={aggregated.strategy}
+      stats={aggregated.stats}
+      heroHand={heroHand}
+      aside={heroHand && hero.cards && <HeroComboCard node={node} cards={hero.cards} />}
+    />
+  )
+}
+
+/** ハンドクラスでまとめず、自分の2枚そのものの戦略を出す。スートによって戦略が変わることがあるため */
+function HeroComboCard({ node, cards }: { node: PlayerNode; cards: [string, string] }) {
+  const actions = toActions(node.actions, node.pot)
+  const combo = node.hands.find((h) => isSameHoleCards(h.cards, cards.join('')))
+  const onBoard = cards.some((card) => node.board.includes(card))
+
+  let body
+  if (onBoard) {
+    body = <p className="empty-note">手札がボードと重なっています。手札かボードを見直してください。</p>
+  } else if (!combo || combo.weight <= 0) {
+    body = <p className="empty-note">このラインでは、このハンドはレンジに含まれていません。</p>
+  } else {
+    body = (
+      <>
+        <ul className="action-list">
+          {actions.map((action, index) => (
+            <li key={action.label} className="action-row static">
+              <span className="swatch" style={{ background: actionColor(action) }} />
+              <span>{action.label}</span>
+              <span className="num">{formatPercent(combo.strategy[index])}</span>
+            </li>
+          ))}
+        </ul>
+        <dl className="hand-stats">
+          <div>
+            <dt>EV</dt>
+            <dd className="num">{toBb(combo.ev ?? 0).toFixed(2)}bb</dd>
+          </div>
+          <div>
+            <dt>エクイティ</dt>
+            <dd className="num">{formatPercent(combo.equity ?? 0)}</dd>
+          </div>
+        </dl>
+      </>
+    )
+  }
+
+  return (
+    <section className="card hero-card">
+      <header className="card-header">
+        自分の手札
+        <span className="aside">
+          <BoardCards cards={cards} />
+        </span>
+      </header>
+      {body}
+    </section>
+  )
 }
