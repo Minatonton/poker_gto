@@ -39,7 +39,8 @@ pub struct SpotConfig {
 
 pub fn build_game(config: &SpotConfig) -> Result<PostFlopGame, String> {
     let board = config.board.replace(' ', "");
-    if !matches!(board.len(), 6 | 8 | 10) {
+    // 後でバイト位置で切り出すため、マルチバイト文字で panic しないよう先に弾く
+    if !board.is_ascii() || !matches!(board.len(), 6 | 8 | 10) {
         return Err(format!("ボードは3〜5枚で指定してください: {}", config.board));
     }
     let turn = if board.len() >= 8 { card_from_str(&board[6..8])? } else { NOT_DEALT };
@@ -84,4 +85,27 @@ fn parse_range(notation: &str) -> Result<Range, String> {
 fn street_sizes(sizes: &StreetSizes) -> Result<[BetSizeOptions; 2], String> {
     let parse = |s: &SizeOptions| BetSizeOptions::try_from((s.bet.as_str(), s.raise.as_str()));
     Ok([parse(&sizes.oop)?, parse(&sizes.ip)?])
+}
+
+#[cfg(test)]
+#[allow(non_snake_case)]
+mod tests {
+    use super::*;
+
+    fn config_with_board(board: &str) -> SpotConfig {
+        let sizes = serde_json::json!({ "oop": { "bet": "50%", "raise": "" }, "ip": { "bet": "50%", "raise": "" } });
+        serde_json::from_value(serde_json::json!({
+            "oopRange": "AA", "ipRange": "KK", "board": board,
+            "startingPot": 100, "effectiveStack": 100, "rakeRate": 0.0, "rakeCap": 0.0,
+            "flop": sizes, "turn": sizes, "river": sizes,
+            "addAllinThreshold": 0.0, "forceAllinThreshold": 0.0
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn マルチバイト文字を含むボードはpanicせずエラーになる() {
+        assert!(build_game(&config_with_board("Ａs9d6h")).is_err());
+        assert!(build_game(&config_with_board("Td9d6é")).is_err());
+    }
 }
