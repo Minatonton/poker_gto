@@ -78,11 +78,20 @@ function HandDetail({ hand, strategy, stats }: { hand: HandClass; strategy: Stra
       ) : (
         <>
           <ul className="action-list">
+            {stats && (
+              <li className="action-row static with-ev head">
+                <span />
+                <span>アクション</span>
+                <span className="num">頻度</span>
+                <span className="num">EV</span>
+              </li>
+            )}
             {strategy.actions.map((action, index) => (
-              <li key={action.label} className="action-row static">
+              <li key={action.label} className={`action-row static ${stats ? 'with-ev' : ''}`}>
                 <span className="swatch" style={{ background: actionColor(action) }} />
                 <span>{action.label}</span>
                 <span className="num">{formatPercent(frequencies[index])}</span>
+                {stats && <span className="num muted">{stats.actionEvs[index].toFixed(2)}</span>}
               </li>
             ))}
           </ul>

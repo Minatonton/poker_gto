@@ -1,9 +1,17 @@
 import { HAND_GRID, type HandClass } from '../poker/hands'
 import type { Strategy } from '../poker/strategy'
+import type { HandStats } from '../solver/aggregate'
 import { actionColor } from './actionColors'
+
+/** グリッドの色で何を表すか。EV と EQ はソルブ結果のときだけ選べる */
+export type GridMode = 'strategy' | 'ev' | 'equity'
 
 interface Props {
   strategy: Strategy
+  mode: GridMode
+  stats?: Map<HandClass, HandStats>
+  /** EV の色の基準にするポット（bb） */
+  potBb?: number
   /** 指定すると、そのアクションの頻度だけを色付けして表示する */
   focusedAction: number | null
   selectedHand: HandClass | null
@@ -15,12 +23,27 @@ interface Props {
 /** 塗りが左上のラベルまで届かないセルでは、白い文字が背景に埋もれるため濃い文字にする */
 const LABEL_ON_FILL_MIN_WEIGHT = 0.75
 
-export function RangeGrid({ strategy, focusedAction, selectedHand, heroHand, onHover, onSelect }: Props) {
+export function RangeGrid({
+  strategy,
+  mode,
+  stats,
+  potBb = 1,
+  focusedAction,
+  selectedHand,
+  heroHand,
+  onHover,
+  onSelect,
+}: Props) {
   return (
     <div className="range-grid" onMouseLeave={() => onHover(null)}>
       {HAND_GRID.flat().map((hand) => {
         const weight = strategy.weights?.get(hand) ?? 1
         const labelOnBackground = weight < LABEL_ON_FILL_MIN_WEIGHT
+        const handStats = stats?.get(hand)
+        const background =
+          mode === 'strategy' || !handStats
+            ? strategyBackground(strategy, hand, focusedAction)
+            : heatColor(mode === 'equity' ? handStats.equity : handStats.ev / potBb)
         return (
           <button
             key={hand}
@@ -30,11 +53,15 @@ export function RangeGrid({ strategy, focusedAction, selectedHand, heroHand, onH
             onClick={() => onSelect(selectedHand === hand ? null : hand)}
             aria-label={hand}
           >
-            <span
-              className="range-fill"
-              style={{ height: `${weight * 100}%`, background: cellBackground(strategy, hand, focusedAction) }}
-            />
-            <span className="range-label">{hand}</span>
+            <span className="range-fill" style={{ height: `${weight * 100}%`, background }} />
+            <span className="range-label">
+              {hand}
+              {mode !== 'strategy' && handStats && (
+                <span className="range-value">
+                  {mode === 'equity' ? Math.round(handStats.equity * 100) : handStats.ev.toFixed(1)}
+                </span>
+              )}
+            </span>
             {heroHand === hand && <span className="hero-mark" aria-label="自分のハンド" />}
           </button>
         )
@@ -44,7 +71,7 @@ export function RangeGrid({ strategy, focusedAction, selectedHand, heroHand, onH
 }
 
 /** 頻度の比率で左から色を塗り分ける */
-function cellBackground(strategy: Strategy, hand: HandClass, focusedAction: number | null): string {
+function strategyBackground(strategy: Strategy, hand: HandClass, focusedAction: number | null): string {
   const frequencies = strategy.frequencies.get(hand) ?? []
   const stops: string[] = []
   let position = 0
@@ -57,4 +84,13 @@ function cellBackground(strategy: Strategy, hand: HandClass, focusedAction: numb
     position = end
   })
   return stops.length === 0 ? 'transparent' : `linear-gradient(to right, ${stops.join(', ')})`
+}
+
+/**
+ * 0〜1 を赤（低い）から緑（高い）へ。EV はポットに対する割合で渡すので、
+ * ポットを丸ごと取れるハンドが緑、ほとんど取れないハンドが赤になる
+ */
+function heatColor(ratio: number): string {
+  const clamped = Math.min(1, Math.max(0, ratio))
+  return `hsl(${Math.round(clamped * 130)} 48% 36%)`
 }

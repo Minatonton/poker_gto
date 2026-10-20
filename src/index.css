@@ -952,3 +952,125 @@ button.action-row:hover {
   border: 2px solid var(--accent);
   border-radius: 999px;
 }
+
+/* ---------- EV・EQ ---------- */
+
+.range-label {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.range-value {
+  font-family: var(--mono);
+  font-size: 0.82em;
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+.study-main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.card-header .segmented-row {
+  grid-template-columns: auto auto;
+  gap: 10px;
+}
+
+.action-row.with-ev {
+  grid-template-columns: 10px 1fr 64px 56px;
+}
+
+.action-row.head {
+  padding-top: 0;
+  padding-bottom: 2px;
+  font-size: 11px;
+  color: var(--label);
+}
+
+.range-summary {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.range-summary th,
+.range-summary td {
+  padding: 9px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--mist);
+}
+
+.range-summary tr:last-child th,
+.range-summary tr:last-child td {
+  border-bottom: none;
+}
+
+.range-summary thead th {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--label);
+}
+
+.range-summary .num {
+  text-align: right;
+}
+
+.range-summary tbody th {
+  font-weight: 500;
+}
+
+.range-summary tr.acting {
+  background: var(--bg-subtle);
+}
+
+.equity-graph {
+  display: block;
+  width: 100%;
+  height: auto;
+  padding: 8px 8px 0;
+}
+
+.equity-graph .grid-line {
+  stroke: var(--mist);
+  stroke-width: 1;
+}
+
+.equity-graph .tick {
+  font-family: var(--mono);
+  font-size: 10px;
+  fill: var(--muted);
+}
+
+.equity-graph .curve {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+
+.equity-graph .curve.dashed,
+.legend-line.dashed {
+  stroke: var(--label);
+  stroke-dasharray: 5 4;
+}
+
+.legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-line {
+  display: inline-block;
+  width: 18px;
+  height: 0;
+  margin-left: 8px;
+  border-top: 2px solid var(--ink);
+}
+
+.legend-line.dashed {
+  border-top: 2px dashed var(--label);
+}

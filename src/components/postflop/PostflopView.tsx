@@ -9,6 +9,7 @@ import { actionColor, formatPercent } from '../actionColors'
 import { DecisionBar } from '../DecisionBar'
 import { StudyView } from '../StudyView'
 import { BoardCards, CardPicker, PlayingCard } from './Cards'
+import { EquityGraph, RangeSummaryCard } from './RangeSummary'
 import { SolveSettings } from './SolveSettings'
 
 type Phase =
@@ -240,12 +241,17 @@ function NodeBody({
   const actor = node.player === 0 ? spot.oop : spot.ip
   const heroHand = heroHandFor(hero, actor)
   return (
-    <StudyView
-      strategy={aggregated.strategy}
-      stats={aggregated.stats}
-      heroHand={heroHand}
-      aside={heroHand && hero.cards && <HeroComboCard node={node} cards={hero.cards} />}
-    />
+    <>
+      <RangeSummaryCard spot={spot} node={node} />
+      <StudyView
+        strategy={aggregated.strategy}
+        stats={aggregated.stats}
+        potBb={toBb(node.pot)}
+        heroHand={heroHand}
+        aside={heroHand && hero.cards && <HeroComboCard node={node} cards={hero.cards} />}
+        below={<EquityGraph spot={spot} node={node} />}
+      />
+    </>
   )
 }
 
@@ -264,11 +270,18 @@ function HeroComboCard({ node, cards }: { node: PlayerNode; cards: [string, stri
     body = (
       <>
         <ul className="action-list">
+          <li className="action-row static with-ev head">
+            <span />
+            <span>アクション</span>
+            <span className="num">頻度</span>
+            <span className="num">EV</span>
+          </li>
           {actions.map((action, index) => (
-            <li key={action.label} className="action-row static">
+            <li key={action.label} className="action-row static with-ev">
               <span className="swatch" style={{ background: actionColor(action) }} />
               <span>{action.label}</span>
               <span className="num">{formatPercent(combo.strategy[index])}</span>
+              <span className="num muted">{toBb(combo.actionEvs[index] ?? 0).toFixed(2)}</span>
             </li>
           ))}
         </ul>

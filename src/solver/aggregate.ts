@@ -7,6 +7,8 @@ export interface HandStats {
   /** bb */
   ev: number
   equity: number
+  /** strategy.actions と同じ並びの、そのアクションを選んだときの EV（bb） */
+  actionEvs: number[]
 }
 
 export interface AggregatedNode {
@@ -21,7 +23,7 @@ export function aggregateNode(node: PlayerNode): AggregatedNode {
   const actions = toActions(node.actions, node.pot)
   const sums = new Map<
     HandClass,
-    { weight: number; normalizedWeight: number; strategy: number[]; ev: number; equity: number }
+    { weight: number; normalizedWeight: number; strategy: number[]; actionEvs: number[]; ev: number; equity: number }
   >()
 
   for (const hand of node.hands) {
@@ -31,6 +33,7 @@ export function aggregateNode(node: PlayerNode): AggregatedNode {
       weight: 0,
       normalizedWeight: 0,
       strategy: actions.map(() => 0),
+      actionEvs: actions.map(() => 0),
       ev: 0,
       equity: 0,
     }
@@ -38,6 +41,7 @@ export function aggregateNode(node: PlayerNode): AggregatedNode {
     sum.weight += hand.weight
     sum.normalizedWeight += w
     hand.strategy.forEach((f, i) => (sum.strategy[i] += f * w))
+    hand.actionEvs.forEach((ev, i) => (sum.actionEvs[i] += (ev ?? 0) * w))
     sum.ev += (hand.ev ?? 0) * w
     sum.equity += (hand.equity ?? 0) * w
     sums.set(handClass, sum)
@@ -55,7 +59,11 @@ export function aggregateNode(node: PlayerNode): AggregatedNode {
     }
     frequencies.set(hand, sum.strategy.map((f) => f / sum.normalizedWeight))
     weights.set(hand, sum.weight / comboCount(hand))
-    stats.set(hand, { ev: toBb(sum.ev / sum.normalizedWeight), equity: sum.equity / sum.normalizedWeight })
+    stats.set(hand, {
+      ev: toBb(sum.ev / sum.normalizedWeight),
+      equity: sum.equity / sum.normalizedWeight,
+      actionEvs: sum.actionEvs.map((ev) => toBb(ev / sum.normalizedWeight)),
+    })
   }
 
   return { strategy: { actions, frequencies, weights }, stats }
@@ -74,5 +82,24 @@ export function toActions(solverActions: SolverAction[], pot: number): Action[] 
     const name = { bet: 'Bet', raise: 'Raise', allin: 'Allin' }[action.kind]
     const potShare = action.kind === 'bet' ? ` (${Math.round((action.amount / pot) * 100)}%)` : ''
     return { kind: 'raise', label: `${name} ${bb}bb${potShare}`, amount: bb, shade: aggressive.indexOf(action) }
+  })
+}
+
+export interface EquityPoint {
+  /** レンジの上位から何割のところか（0〜1） */
+  percentile: number
+  equity: number
+}
+
+/** EQ の高い順に並べ、コンボの重みの累積を横軸にした曲線。グラフが上にあるほどレンジが強い */
+export function equityCurve(hands: { normalizedWeight: number; equity: number | null }[]): EquityPoint[] {
+  const reaching = hands
+    .filter((h) => h.normalizedWeight > 0 && h.equity !== null)
+    .sort((a, b) => (b.equity ?? 0) - (a.equity ?? 0))
+  const total = reaching.reduce((sum, h) => sum + h.normalizedWeight, 0)
+  let cumulative = 0
+  return reaching.map((h) => {
+    cumulative += h.normalizedWeight
+    return { percentile: cumulative / total, equity: h.equity ?? 0 }
   })
 }

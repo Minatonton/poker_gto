@@ -40,8 +40,28 @@ export interface SolverHand {
   /** weight にカードの重なりを考慮した相手のコンボ数を掛けたもの。平均を取るときの重みに使う */
   normalizedWeight: number
   strategy: number[]
+  /** strategy と同じ並びの、そのアクションを選んだときの EV（チップ） */
+  actionEvs: (number | null)[]
+  /** このノードからポットのうち取り戻せるチップの期待値 */
   ev: number | null
   equity: number | null
+}
+
+export interface OpponentHand {
+  cards: string
+  weight: number
+  normalizedWeight: number
+  ev: number | null
+  equity: number | null
+}
+
+export interface RangeSummary {
+  combos: number
+  equity: number
+  /** チップ */
+  ev: number
+  /** EV ÷ (EQ × ポット) */
+  eqr: number
 }
 
 interface NodeBase {
@@ -50,7 +70,15 @@ interface NodeBase {
   bets: [number, number]
 }
 
-export type PlayerNode = NodeBase & { kind: 'player'; player: 0 | 1; actions: SolverAction[]; hands: SolverHand[] }
+export type PlayerNode = NodeBase & {
+  kind: 'player'
+  player: 0 | 1
+  actions: SolverAction[]
+  hands: SolverHand[]
+  opponentHands: OpponentHand[]
+  /** [OOP, IP] */
+  ranges: [RangeSummary, RangeSummary]
+}
 export type ChanceNode = NodeBase & { kind: 'chance'; possibleCards: number[] }
 export type TerminalNode = NodeBase & { kind: 'terminal' }
 export type NodeInfo = PlayerNode | ChanceNode | TerminalNode
