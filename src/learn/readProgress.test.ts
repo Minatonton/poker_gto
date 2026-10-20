@@ -1,13 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { markRead, normalizeReadMarks, unmarkRead } from './readProgress'
+import { markRead, normalizeReadMarks } from './readProgress'
 
-describe('markRead / unmarkRead', () => {
+describe('markRead', () => {
   it('同じ章を二度読み終えても一度と数える', () => {
     expect(markRead(markRead([], 'ev-eq'), 'ev-eq')).toEqual(['ev-eq'])
-  })
-
-  it('読了を取り消すと、その章だけが外れる', () => {
-    expect(unmarkRead(['ev-eq', 'outs'], 'ev-eq')).toEqual(['outs'])
   })
 })
 

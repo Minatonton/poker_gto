@@ -8,6 +8,7 @@ import {
   type Section,
 } from './app/navigation'
 import { formatPercent } from './components/actionColors'
+import { setSoundEnabled, useSoundEnabled } from './components/game/sound'
 import { cashSolution, MAX_PLAYERS, MIN_PLAYERS } from './data/cashSolutions'
 import { LearnPage } from './pages/LearnPage'
 import { PostflopHand } from './pages/analyze/PostflopHand'
@@ -63,6 +64,7 @@ export default function App() {
   const [pickedLine, setPickedLine] = useState<PreflopLine | null>(null)
   const [solvedSpot, setSolvedSpot] = useState<PostflopSpot | null>(null)
   const [reviews, setReviews] = useState(loadReviews)
+  const sound = useSoundEnabled()
   const [selectedReview, setSelectedReview] = useState<string | null>(null)
 
   const walk = useMemo(() => walkPreflop(solution, choices), [solution, choices])
@@ -130,7 +132,7 @@ export default function App() {
   }
 
   return (
-    <>
+    <div className="app">
       <header className="app-header">
         <span className="brand">Poker GTO</span>
         <nav className="section-tabs" aria-label="画面">
@@ -139,13 +141,23 @@ export default function App() {
               key={item.section}
               className="section-tab"
               aria-current={section === item.section ? 'page' : undefined}
+              title={item.description}
               onClick={() => setSection(item.section)}
             >
-              <span className="section-label">{item.label}</span>
-              <span className="section-description">{item.description}</span>
+              {item.label}
             </button>
           ))}
         </nav>
+        {section === 'analyze' && <SubTabs options={ANALYZE_VIEWS} value={analyzeView} onChange={setAnalyzeView} />}
+        {section === 'practice' && <SubTabs options={PRACTICE_VIEWS} value={practiceView} onChange={setPracticeView} />}
+        <button
+          className="sound-toggle"
+          aria-pressed={sound}
+          onClick={() => setSoundEnabled(!sound)}
+          title="効果音のオンとオフ"
+        >
+          {sound ? '音あり' : '音なし'}
+        </button>
         <label className="players-select">
           人数
           <select value={players} onChange={(e) => changePlayers(Number(e.target.value))}>
@@ -159,9 +171,7 @@ export default function App() {
       </header>
 
       <main className="page" hidden={section !== 'analyze'}>
-        <SubTabs options={ANALYZE_VIEWS} value={analyzeView} onChange={setAnalyzeView} />
-
-        <div hidden={analyzeView !== 'hand'} className="page-stack">
+        <div hidden={analyzeView !== 'hand'} className="view game">
           {walk.status === 'finished' && spotAtFlop ? (
             // ラインが変わったらソルブ結果も別物になるため、ラインごとに作り直す
             <PostflopHand
@@ -195,20 +205,19 @@ export default function App() {
           )}
         </div>
 
-        <div hidden={analyzeView !== 'compare'} className="page-stack">
+        <div hidden={analyzeView !== 'compare'} className="view scroll">
           <ReportPage spot={spotAtFlop} onOpenPreflop={openAnalyze} />
         </div>
       </main>
 
       <main className="page" hidden={section !== 'practice'}>
-        <SubTabs options={PRACTICE_VIEWS} value={practiceView} onChange={setPracticeView} />
-        <div hidden={practiceView !== 'trainer'} className="page-stack">
+        <div hidden={practiceView !== 'trainer'} className="view game">
           <TrainerPage key={players} solution={solution} solvedSpot={solvedSpot} onOpenAnalyze={openAnalyze} />
         </div>
-        <div hidden={practiceView !== 'drill'} className="page-stack">
+        <div hidden={practiceView !== 'drill'} className="view scroll">
           <RangeDrillPage key={players} solution={solution} />
         </div>
-        <div hidden={practiceView !== 'review'} className="page-stack">
+        <div hidden={practiceView !== 'review'} className="view scroll">
           <ReviewPage
             reviews={reviews}
             selectedId={selectedReview}
@@ -220,8 +229,10 @@ export default function App() {
       </main>
 
       <main className="page" hidden={section !== 'learn'}>
-        <LearnPage />
+        <div className="view game">
+          <LearnPage />
+        </div>
       </main>
-    </>
+    </div>
   )
 }

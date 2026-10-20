@@ -22,8 +22,8 @@ export interface Chapter {
   /** 本文の数字を実際の場面に当てはめる例題。答えは押してから見せる */
   example?: { question: ReactNode; answer: ReactNode }
   quiz: Quiz[]
-  /** 触って確かめる道具 */
-  tools?: ReactNode
+  /** 触って確かめる道具。1つずつページに分けて出す */
+  tools?: ReactNode[]
   sources: { title: string; url: string }[]
 }
 
@@ -115,13 +115,7 @@ export const CHAPTERS: Chapter[] = [
         why: 'コール額は 100、コールした後のポットは 100 ＋ 100 ＋ 100 ＝ 300。100 ÷ 300 ≒ 33% です。',
       },
     ],
-    tools: (
-      <>
-        <BetOddsCard />
-        <EquityCard />
-        <CallOddsCard />
-      </>
-    ),
+    tools: [<BetOddsCard key="bet" />, <EquityCard key="equity" />, <CallOddsCard key="call" />],
     sources: [{ title: 'EVとEQ', url: `${NOTE}n92909ce3823e` }],
   },
   {
@@ -183,7 +177,7 @@ export const CHAPTERS: Chapter[] = [
         why: 'めくるのは 1 枚なので、9 × 2% ＝ 約 18% です。36% はフロップから 2 枚めくるときの値です。',
       },
     ],
-    tools: <OutsCard />,
+    tools: [<OutsCard key="OutsCard" />],
     sources: [{ title: 'EVとEQ', url: `${NOTE}n92909ce3823e` }],
   },
   {
@@ -273,7 +267,7 @@ export const CHAPTERS: Chapter[] = [
         why: 'MDF ＝ P ÷ (P ＋ B) ＝ 1 ÷ 2 ＝ 50% です。33% は相手の必要勝率の方です。',
       },
     ],
-    tools: <BetOddsCard />,
+    tools: [<BetOddsCard key="BetOddsCard" />],
     sources: [{ title: 'bet sizeの第一歩', url: `${NOTE}ndc8338bdbf1e` }],
   },
   {
@@ -331,7 +325,7 @@ export const CHAPTERS: Chapter[] = [
         why: 'GTO は搾取されないことを保証する戦略です。偏った相手からより多く取れるのは MES の方で、GTO が控えめという意味でもありません。',
       },
     ],
-    tools: <RockPaperScissors />,
+    tools: [<RockPaperScissors key="RockPaperScissors" />],
     sources: [
       { title: 'GTOとは何か-誤解と理解-', url: `${NOTE}ndb36157966dd` },
       { title: 'GTOとは何か-対GTO-', url: `${NOTE}n0d05bcb9d08f` },
@@ -443,7 +437,7 @@ export const CHAPTERS: Chapter[] = [
         why: 'AA や KK のような一番強いハンドは 3ベットに回るので、コールしたレンジからは抜けています。上が欠けたキャップドです。',
       },
     ],
-    tools: <AkqGame />,
+    tools: [<AkqGame key="AkqGame" />],
     sources: [
       { title: 'ハンドとレンジ', url: `${NOTE}n39c55dd3e58f` },
       { title: 'ポラライズ-レンジの類別-', url: `${NOTE}na5d11afa3cb3` },
@@ -561,7 +555,7 @@ export const CHAPTERS: Chapter[] = [
         why: '1 ＋ 2400 ÷ 100 ＝ 25。(1 ＋ 2r)² ＝ 25 なので 1 ＋ 2r ＝ 5、r ＝ 2。毎回ポットの 200% です。',
       },
     ],
-    tools: <GeometricCard />,
+    tools: [<GeometricCard key="GeometricCard" />],
     sources: [{ title: 'Geometric Betsize', url: `${NOTE}n7d55df1ca58f` }],
   },
   {

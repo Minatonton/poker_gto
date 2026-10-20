@@ -19,7 +19,7 @@ import { spotConfig, type Street, type StreetSizeOptions } from '../../solver/sp
 import type { NodeInfo, PlayerNode } from '../../solver/types'
 import { usePostflopSolve, type PathEntry } from '../../solver/usePostflopSolve'
 import { coachForSeat, preflopHistory } from './handHelpers'
-import { TableLayout } from './TableLayout'
+import { GameScreen, type DockTab } from '../../components/game/GameScreen'
 
 /**
  * ベットサイズを1つ増やすごとに後続のツリーが掛け算で増える。
@@ -80,8 +80,126 @@ export function PostflopHand(props: PostflopHandProps) {
 
   const handAdvice = node?.kind === 'player' && actor ? adviceForHero(node, actor, hero) : undefined
 
+  const advice = node?.kind === 'player' && aggregated && actor && (
+    <>
+      <AdvicePanel
+        actor={actor}
+        actions={aggregated.strategy.actions}
+        rangeFrequencies={overallFrequencies(aggregated.strategy)}
+        hand={handAdvice?.advice}
+        note={handAdvice?.note}
+        hidden={hidden}
+        onToggleHidden={() => setHidden(!hidden)}
+      />
+      {!hidden && (
+        <StudyView
+          key={solve.path.length}
+          strategy={aggregated.strategy}
+          stats={aggregated.stats}
+          potBb={toBb(node.pot)}
+          heroHand={heroHandFor(hero, actor)}
+        />
+      )}
+    </>
+  )
+  const tabs: DockTab[] = [
+    ...(advice ? [{ id: 'answer', label: 'GTO の答え', content: advice }] : []),
+    ...(node?.kind === 'player'
+      ? [
+          {
+            id: 'range',
+            label: 'レンジ分析',
+            content: (
+              <>
+                <RangeSummaryCard spot={spot} node={node} />
+                <RangeBreakdown node={node} />
+                <EquityGraph spot={spot} node={node} />
+              </>
+            ),
+          },
+        ]
+      : []),
+    {
+      id: 'history',
+      label: '履歴',
+      content: (
+        <>
+          {solve.phase.name === 'solved' && (
+            <p className="muted small solve-result">
+              計算結果: {solve.phase.result.iteration} 回反復・精度 ポットの{' '}
+              {formatPercent(solve.phase.result.exploitability / solve.phase.startingPot)}
+            </p>
+          )}
+          <HandHistory
+            entries={history}
+            footer={
+              <div className="finished-actions">
+                <button className="btn small-btn" onClick={onRecord}>
+                  このハンドを記録する
+                </button>
+                <button className="btn small-btn" onClick={() => onNavigate([])}>
+                  最初からやり直す
+                </button>
+              </div>
+            }
+          />
+        </>
+      ),
+    },
+    ...(solve.phase.name === 'idle'
+      ? [
+          {
+            id: 'settings',
+            label: '計算の設定',
+            content: (
+              <section className="card solve-options">
+                <header className="card-header">計算の設定（ベットサイズ・精度）</header>
+                <div className="card-body">
+                  <div className="size-grid">
+                    <span />
+                    <span className="head">ベット（ポット比 % / オールイン a）</span>
+                    <span className="head">レイズ（倍率 x）</span>
+                    {(Object.keys(STREET_LABELS) as Street[]).map((street) => (
+                      <SizeRow
+                        key={street}
+                        label={STREET_LABELS[street]}
+                        value={sizes[street]}
+                        onChange={(value) => setSizes({ ...sizes, [street]: value })}
+                      />
+                    ))}
+                  </div>
+                  <div className="field-pair">
+                    <label className="field">
+                      <span>最大反復回数</span>
+                      <input
+                        type="number"
+                        min={10}
+                        value={maxIterations}
+                        onChange={(e) => setMaxIterations(Number(e.target.value))}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>目標精度（ポット比 %）</span>
+                      <input
+                        type="number"
+                        min={0.1}
+                        step={0.1}
+                        value={targetPercent}
+                        onChange={(e) => setTargetPercent(Number(e.target.value))}
+                      />
+                    </label>
+                  </div>
+                  <p className="muted small">サイズを増やすと計算は正確になりますが、時間とメモリが大きく増えます。</p>
+                </div>
+              </section>
+            ),
+          },
+        ]
+      : []),
+  ]
+
   return (
-    <TableLayout
+    <GameScreen
       coach={<Coach phase={solve.phase.name} node={node} actor={actor} hero={hero} flopReady={flop.length === 3} />}
       table={
         <PokerTable
@@ -90,7 +208,11 @@ export function PostflopHand(props: PostflopHandProps) {
           board={board}
           boardSlots={node ? (node.kind === 'chance' ? node.board.length + 1 : node.board.length) : 3}
           onBoardClick={
-            solve.phase.name === 'idle' ? () => setPicking('flop') : node?.kind === 'chance' ? () => setPicking('next') : undefined
+            solve.phase.name === 'idle'
+              ? () => setPicking('flop')
+              : node?.kind === 'chance'
+                ? () => setPicking('next')
+                : undefined
           }
           onSeatClick={(position) =>
             onHeroInput({ ...heroInput, position: heroInput.position === position ? null : position })
@@ -106,7 +228,9 @@ export function PostflopHand(props: PostflopHandProps) {
                 heroCards={heroCards}
                 onHero={(cards) => onHeroInput({ ...heroInput, cardsText: cards.join('') })}
                 onFlop={setFlop}
-                onNext={(card) => solve.setPath([...solve.path, { kind: 'card', choice: card, card: cardFromId(card) }])}
+                onNext={(card) =>
+                  solve.setPath([...solve.path, { kind: 'card', choice: card, card: cardFromId(card) }])
+                }
                 onClose={() => setPicking(null)}
               />
             )
@@ -124,33 +248,6 @@ export function PostflopHand(props: PostflopHandProps) {
                 ランダムなフロップ
               </button>
             </div>
-            <details className="solve-options">
-              <summary>計算の設定（ベットサイズ・精度）</summary>
-              <div className="size-grid">
-                <span />
-                <span className="head">ベット（ポット比 % / オールイン a）</span>
-                <span className="head">レイズ（倍率 x）</span>
-                {(Object.keys(STREET_LABELS) as Street[]).map((street) => (
-                  <SizeRow
-                    key={street}
-                    label={STREET_LABELS[street]}
-                    value={sizes[street]}
-                    onChange={(value) => setSizes({ ...sizes, [street]: value })}
-                  />
-                ))}
-              </div>
-              <div className="field-pair">
-                <label className="field">
-                  <span>最大反復回数</span>
-                  <input type="number" min={10} value={maxIterations} onChange={(e) => setMaxIterations(Number(e.target.value))} />
-                </label>
-                <label className="field">
-                  <span>目標精度（ポット比 %）</span>
-                  <input type="number" min={0.1} step={0.1} value={targetPercent} onChange={(e) => setTargetPercent(Number(e.target.value))} />
-                </label>
-              </div>
-              <p className="muted small">サイズを増やすと計算は正確になりますが、時間とメモリが大きく増えます。</p>
-            </details>
             {solve.error && <p className="error small">{solve.error}</p>}
           </div>
         ) : solve.phase.name === 'solving' ? (
@@ -194,63 +291,7 @@ export function PostflopHand(props: PostflopHandProps) {
           </div>
         )
       }
-      side={
-        <>
-          {node?.kind === 'player' && aggregated && actor && (
-            <AdvicePanel
-              actor={actor}
-              actions={aggregated.strategy.actions}
-              rangeFrequencies={overallFrequencies(aggregated.strategy)}
-              hand={handAdvice?.advice}
-              note={handAdvice?.note}
-              hidden={hidden}
-              onToggleHidden={() => setHidden(!hidden)}
-            />
-          )}
-          {solve.phase.name === 'solved' && (
-            <p className="muted small solve-result">
-              計算結果: {solve.phase.result.iteration} 回反復・精度 ポットの{' '}
-              {formatPercent(solve.phase.result.exploitability / solve.phase.startingPot)}
-            </p>
-          )}
-          <HandHistory
-            entries={history}
-            footer={
-              <div className="finished-actions">
-                <button className="btn small-btn" onClick={onRecord}>
-                  このハンドを記録する
-                </button>
-                <button className="btn small-btn" onClick={() => onNavigate([])}>
-                  最初からやり直す
-                </button>
-              </div>
-            }
-          />
-        </>
-      }
-      below={
-        node?.kind === 'player' &&
-        aggregated &&
-        actor && (
-          <section className="detail-section">
-            <h2 className="detail-heading">{actor} のレンジ全体の戦略</h2>
-            <RangeSummaryCard spot={spot} node={node} />
-            <StudyView
-              key={solve.path.length}
-              strategy={aggregated.strategy}
-              stats={aggregated.stats}
-              potBb={toBb(node.pot)}
-              heroHand={heroHandFor(hero, actor)}
-              below={
-                <>
-                  <RangeBreakdown node={node} />
-                  <EquityGraph spot={spot} node={node} />
-                </>
-              }
-            />
-          </section>
-        )
-      }
+      tabs={tabs}
     />
   )
 }
@@ -290,7 +331,8 @@ function Coach({
   if (node.kind === 'chance') {
     return <strong>{node.board.length === 3 ? 'ターン' : 'リバー'}のカードを選んでください。</strong>
   }
-  if (node.kind === 'terminal') return <strong>このラインはここで終わりです。履歴の行を押すと、そこからやり直せます。</strong>
+  if (node.kind === 'terminal')
+    return <strong>このラインはここで終わりです。履歴の行を押すと、そこからやり直せます。</strong>
   const seatHint = coachForSeat(hero)
   return (
     <>
@@ -308,7 +350,11 @@ function Coach({
   )
 }
 
-function SolvingBadge({ phase }: { phase: Extract<ReturnType<typeof usePostflopSolve>['phase'], { name: 'solving' }> }) {
+function SolvingBadge({
+  phase,
+}: {
+  phase: Extract<ReturnType<typeof usePostflopSolve>['phase'], { name: 'solving' }>
+}) {
   const ratio = phase.status ? phase.status.iteration / phase.options.maxIterations : 0
   return (
     <span className="solving-badge">
@@ -433,8 +479,16 @@ function SizeRow({
   return (
     <>
       <span>{label}</span>
-      <input aria-label={`${label}のベット`} value={value.bet} onChange={(e) => onChange({ ...value, bet: e.target.value })} />
-      <input aria-label={`${label}のレイズ`} value={value.raise} onChange={(e) => onChange({ ...value, raise: e.target.value })} />
+      <input
+        aria-label={`${label}のベット`}
+        value={value.bet}
+        onChange={(e) => onChange({ ...value, bet: e.target.value })}
+      />
+      <input
+        aria-label={`${label}のレイズ`}
+        value={value.raise}
+        onChange={(e) => onChange({ ...value, raise: e.target.value })}
+      />
     </>
   )
 }
@@ -497,9 +551,11 @@ function postflopSeats(
 function adviceForHero(node: PlayerNode, actor: string, hero: Hero): { advice?: HandAdvice; note?: string } {
   if (hero.position !== actor || !hero.cards) return {}
   const cards = hero.cards
-  if (cards.some((card) => node.board.includes(card))) return { note: '手札がボードと重なっています。手札を選び直してください。' }
+  if (cards.some((card) => node.board.includes(card)))
+    return { note: '手札がボードと重なっています。手札を選び直してください。' }
   const combo = node.hands.find((h) => isSameHoleCards(h.cards, cards.join('')))
-  if (!combo || combo.weight <= 0) return { note: 'このラインでは、あなたの手札は GTO のレンジに含まれていません。レンジ全体の答えを出しています。' }
+  if (!combo || combo.weight <= 0)
+    return { note: 'このラインでは、あなたの手札は GTO のレンジに含まれていません。レンジ全体の答えを出しています。' }
   return {
     advice: {
       label: cards.join(''),

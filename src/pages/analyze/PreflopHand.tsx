@@ -12,7 +12,7 @@ import { coachForSeat, preflopHistory } from './handHelpers'
 import type { Position, PreflopSolution, Walk } from '../../poker/preflop'
 import type { PreflopLine } from '../../poker/preflopLine'
 import { overallFrequencies, type ActionKind } from '../../poker/strategy'
-import { TableLayout } from './TableLayout'
+import { GameScreen, type DockTab } from '../../components/game/GameScreen'
 
 export interface PreflopHandProps {
   solution: PreflopSolution
@@ -58,8 +58,60 @@ export function PreflopHand(props: PreflopHandProps) {
       <strong>{walk.result}</strong>
     )
 
+  const answerTab: DockTab = {
+    id: 'answer',
+    label: 'GTO の答え',
+    content:
+      walk.status === 'deciding' ? (
+        <>
+          <AdvicePanel
+            actor={walk.position}
+            actions={walk.strategy.actions}
+            rangeFrequencies={overallFrequencies(walk.strategy)}
+            hand={
+              heroHand ? { label: heroHand, frequencies: walk.strategy.frequencies.get(heroHand) ?? [] } : undefined
+            }
+            hidden={hidden}
+            onToggleHidden={() => setHidden(!hidden)}
+          />
+          {!hidden && <StudyView key={`${choices.join()}-${heroHand}`} strategy={walk.strategy} heroHand={heroHand} />}
+        </>
+      ) : (
+        <p className="empty-note">{walk.result}</p>
+      ),
+  }
+  const historyTab: DockTab = {
+    id: 'history',
+    label: '履歴',
+    content: (
+      <HandHistory
+        entries={preflopHistory(walk, choices, onNavigate)}
+        footer={
+          <div className="finished-actions">
+            <button className="btn small-btn" onClick={onRecord}>
+              このハンドを記録する
+            </button>
+            <button className="btn small-btn" onClick={() => onNavigate([])} disabled={choices.length === 0}>
+              最初からやり直す
+            </button>
+          </div>
+        }
+      />
+    ),
+  }
+  const scenarioTab: DockTab = {
+    id: 'scenario',
+    label: '場面を選ぶ',
+    content: (
+      <section className="card">
+        <header className="card-header">シチュエーションを一気に選ぶ</header>
+        <ScenarioPicker solution={solution} line={line} onChange={onLine} />
+      </section>
+    ),
+  }
+
   return (
-    <TableLayout
+    <GameScreen
       coach={coach}
       table={
         <PokerTable
@@ -101,49 +153,7 @@ export function PreflopHand(props: PreflopHandProps) {
           </div>
         )
       }
-      side={
-        <>
-          {walk.status === 'deciding' && (
-            <AdvicePanel
-              actor={walk.position}
-              actions={walk.strategy.actions}
-              rangeFrequencies={overallFrequencies(walk.strategy)}
-              hand={
-                heroHand
-                  ? { label: heroHand, frequencies: walk.strategy.frequencies.get(heroHand) ?? [] }
-                  : undefined
-              }
-              hidden={hidden}
-              onToggleHidden={() => setHidden(!hidden)}
-            />
-          )}
-          <HandHistory
-            entries={preflopHistory(walk, choices, onNavigate)}
-            footer={
-              <div className="finished-actions">
-                <button className="btn small-btn" onClick={onRecord}>
-                  このハンドを記録する
-                </button>
-                <button className="btn small-btn" onClick={() => onNavigate([])} disabled={choices.length === 0}>
-                  最初からやり直す
-                </button>
-              </div>
-            }
-          />
-          <details className="card shortcut">
-            <summary className="card-header">シチュエーションを一気に選ぶ</summary>
-            <ScenarioPicker solution={solution} line={line} onChange={onLine} />
-          </details>
-        </>
-      }
-      below={
-        walk.status === 'deciding' && (
-          <section className="detail-section">
-            <h2 className="detail-heading">{walk.position} のレンジ全体の戦略</h2>
-            <StudyView key={`${choices.join()}-${heroHand}`} strategy={walk.strategy} heroHand={heroHand} />
-          </section>
-        )
-      }
+      tabs={[answerTab, historyTab, scenarioTab]}
     />
   )
 }

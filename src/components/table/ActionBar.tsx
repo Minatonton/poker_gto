@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { Action } from '../../poker/strategy'
 import { actionColor } from '../actionColors'
+import { playCue } from '../game/sound'
 import { actionForKey } from './shortcuts'
 
 interface Props {
@@ -33,6 +34,7 @@ export function ActionBar({ actions, onChoose, disabled = false }: Props) {
       const index = actionForKey(actions, event.key)
       if (index !== null) {
         event.preventDefault()
+        playCue('action')
         onChoose(index)
       }
     }
@@ -47,7 +49,10 @@ export function ActionBar({ actions, onChoose, disabled = false }: Props) {
           key={action.label}
           className={`action-button kind-${action.kind}`}
           style={{ '--action': actionColor(action) } as React.CSSProperties}
-          onClick={() => onChoose(index)}
+          onClick={() => {
+            playCue('action')
+            onChoose(index)
+          }}
           disabled={disabled}
         >
           <span className="action-button-label">{action.label}</span>

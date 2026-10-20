@@ -1,0 +1,761 @@
+/*
+ * ゲーム画面の層。index.css の部品の上に重ね、画面全体を窓の高さに収める。
+ * 分析・壁打ち・教材はページをスクロールさせず、量の多い情報はドックやページ送りの中に閉じ込める
+ */
+
+:root {
+  --felt-center: #1d4537;
+  --felt-mid: #143226;
+  --felt-edge: #0c1f18;
+  --rail: #17191c;
+  --rail-light: #2c3036;
+  --grade-best: #46b06e;
+  --grade-correct: #7cc48f;
+  --grade-inaccuracy: #e0b341;
+  --grade-wrong: #e5774b;
+  --grade-blunder: #e5534b;
+}
+
+/* ---------- 枠 ---------- */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.app-header {
+  position: static;
+  flex: none;
+  gap: 20px;
+  height: 52px;
+  min-height: 52px;
+  padding: 0 18px;
+}
+
+.section-tabs {
+  gap: 2px;
+}
+
+.section-tab {
+  padding: 0 16px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--sub);
+  border-bottom-width: 2px;
+}
+
+.section-tab[aria-current='page'] {
+  color: var(--ink);
+}
+
+.app-header .sub-tabs {
+  align-self: stretch;
+  padding-left: 16px;
+  border-bottom: none;
+  border-left: 1px solid var(--line);
+}
+
+.app-header .sub-tabs button {
+  margin: 0;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+.sound-toggle {
+  margin-left: auto;
+  padding: 5px 10px;
+  font-size: 12px;
+  color: var(--sub);
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+}
+
+.sound-toggle[aria-pressed='false'] {
+  color: var(--muted);
+  border-style: dashed;
+}
+
+.app-header .players-select {
+  margin-left: 0;
+}
+
+main.page {
+  flex: 1;
+  min-height: 0;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  gap: 0;
+}
+
+.view {
+  flex: 1;
+  min-height: 0;
+}
+
+.view.scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow: auto;
+  padding: 20px 28px 48px;
+}
+
+.view.game {
+  display: flex;
+  padding: 12px 16px 16px;
+  overflow: hidden;
+}
+
+/* ---------- ゲーム画面 ---------- */
+
+.game-screen {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr) clamp(340px, 28vw, 420px);
+  gap: 14px;
+  min-width: 0;
+  min-height: 0;
+}
+
+@media (max-width: 960px) {
+  .view.game {
+    overflow: auto;
+  }
+
+  .game-screen {
+    grid-template-columns: 1fr;
+    grid-auto-rows: min-content;
+  }
+
+  .stage {
+    min-height: 620px;
+  }
+}
+
+.stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 45%, #1a1d21 0%, #111316 70%);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.stage-hud {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 52px;
+  padding: 10px 18px;
+}
+
+.stage-hud .coach {
+  padding: 0;
+  font-size: 15px;
+  border: none;
+}
+
+.stage-table {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.stage-table .poker-table {
+  height: 100%;
+  min-height: 300px;
+  margin: 0 12px;
+}
+
+.stage-controls {
+  position: relative;
+  z-index: 5;
+  flex: none;
+  padding: 10px 18px 16px;
+}
+
+.stage-controls .action-buttons {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 200px));
+  justify-content: center;
+}
+
+.stage-controls .finished-actions,
+.stage-controls .solve-controls {
+  justify-content: center;
+}
+
+.stage-controls .solve-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ---------- 卓 ---------- */
+
+.table-felt {
+  background: radial-gradient(ellipse at 50% 42%, var(--felt-center) 0%, var(--felt-mid) 58%, var(--felt-edge) 100%);
+  border: 14px solid var(--rail);
+  box-shadow:
+    inset 0 0 0 2px rgb(255 255 255 / 0.05),
+    inset 0 10px 40px rgb(0 0 0 / 0.45),
+    0 0 0 1px var(--rail-light),
+    0 18px 50px rgb(0 0 0 / 0.55);
+}
+
+.table-pot {
+  background: rgb(0 0 0 / 0.45);
+}
+
+.seat-plate {
+  background: #1b1e22;
+  border-color: #353a43;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.55);
+}
+
+.seat.acting .seat-plate {
+  animation: acting-pulse 1.6s ease-in-out infinite;
+}
+
+.seat-action {
+  padding: 1px 8px;
+  background: rgb(0 0 0 / 0.55);
+  border-radius: 999px;
+  animation: pop-in 0.25s ease-out both;
+}
+
+/* 配られたカードとチップは、置かれた瞬間だけ動かして「いま変わった」ことを伝える */
+.poker-table .playing-card,
+.poker-table .card-back {
+  animation: deal-in 0.32s cubic-bezier(0.2, 0.8, 0.3, 1.15) both;
+}
+
+.seat-bet {
+  animation: chip-in 0.3s ease-out both;
+}
+
+@keyframes deal-in {
+  from {
+    opacity: 0;
+    transform: translateY(-24px) rotate(-10deg) scale(0.85);
+  }
+}
+
+@keyframes chip-in {
+  from {
+    opacity: 0;
+    scale: 0.6;
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.9);
+  }
+}
+
+@keyframes acting-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px var(--accent),
+      0 0 0 0 rgb(236 238 241 / 0.35);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px var(--accent),
+      0 0 0 8px rgb(236 238 241 / 0);
+  }
+}
+
+/* ---------- ドック ---------- */
+
+.dock {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.dock-tabs {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  padding: 6px 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.dock-tabs button {
+  flex: 1;
+  padding: 9px 6px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+}
+
+.dock-tabs button:hover {
+  color: var(--ink);
+}
+
+.dock-tabs button[aria-selected='true'] {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+
+.dock-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  padding: 12px;
+  overflow: auto;
+}
+
+.dock-body .card {
+  flex: none;
+  background: var(--bg-subtle);
+}
+
+.dock .study {
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.dock .grid-card {
+  padding: 8px;
+}
+
+.dock .range-grid {
+  width: 100%;
+  min-width: 0;
+}
+
+.dock .range-cell {
+  padding: 2px 3px;
+  font-size: 10px;
+}
+
+.dock .study-side {
+  position: static;
+}
+
+.dock .advice-answer {
+  font-size: 30px;
+}
+
+.dock .size-grid input {
+  min-width: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .poker-table .playing-card,
+  .poker-table .card-back,
+  .seat-bet,
+  .seat-action,
+  .seat.acting .seat-plate {
+    animation: none;
+  }
+}
+
+/* ---------- 壁打ち ---------- */
+
+.trainer-hud {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 18px;
+}
+
+.hud-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.hud-label strong {
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.hud-streak {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.hud-streak strong {
+  display: inline-block;
+  min-width: 1ch;
+  font-size: 28px;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.hud-streak strong.bump {
+  animation: bump 0.35s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+.hud-daily {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 120px;
+}
+
+.hud-daily-track {
+  height: 6px;
+  overflow: hidden;
+  background: var(--mist);
+  border-radius: 999px;
+}
+
+.hud-daily-track span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.4s ease-out;
+}
+
+.hud-daily-track.done span {
+  background: var(--grade-best);
+}
+
+@keyframes bump {
+  from {
+    transform: scale(1.7);
+    color: var(--grade-best);
+  }
+}
+
+.stage-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 24px;
+  font-size: 15px;
+  color: var(--sub);
+  text-align: center;
+}
+
+.coach .rng {
+  margin-left: 8px;
+  padding: 2px 8px;
+  font-size: 13px;
+}
+
+/* 採点は卓の上に重ね、卓の席がうっすら透けるようにして「この場面の答え」だと分かるようにする */
+.table-overlay:has(.result-card) {
+  background: rgb(10 11 13 / 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.result-card {
+  --grade: var(--accent);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(92%, 540px);
+  max-height: 94%;
+  padding: 20px 24px;
+  overflow: auto;
+  background: rgb(24 25 28 / 0.97);
+  border: 1px solid var(--line-strong);
+  border-top: 4px solid var(--grade);
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgb(0 0 0 / 0.6);
+  animation: card-rise 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.1) both;
+}
+
+.result-card.grade-best {
+  --grade: var(--grade-best);
+}
+
+.result-card.grade-correct {
+  --grade: var(--grade-correct);
+}
+
+.result-card.grade-inaccuracy {
+  --grade: var(--grade-inaccuracy);
+}
+
+.result-card.grade-wrong {
+  --grade: var(--grade-wrong);
+}
+
+.result-card.grade-blunder {
+  --grade: var(--grade-blunder);
+}
+
+.result-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 14px;
+}
+
+.result-grade {
+  font-size: 34px;
+  line-height: 1;
+  color: var(--grade);
+  animation: stamp 0.4s cubic-bezier(0.3, 1.5, 0.5, 1) 0.08s both;
+}
+
+.result-description {
+  font-size: 13px;
+  color: var(--sub);
+}
+
+.result-streak {
+  margin-left: auto;
+  padding: 3px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--on-accent);
+  background: var(--grade-best);
+  border-radius: 999px;
+  animation: pop-in 0.3s ease-out 0.25s both;
+}
+
+.result-loss {
+  font-size: 13px;
+  color: var(--grade);
+}
+
+.result-bars li {
+  padding: 3px 6px;
+  border-radius: 6px;
+}
+
+.result-bars li.chosen {
+  background: var(--hover);
+  box-shadow: inset 2px 0 0 var(--grade);
+}
+
+.result-bars .advice-bar-track span {
+  animation: grow 0.5s ease-out 0.15s both;
+  transform-origin: left;
+}
+
+.result-why {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 12px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--body);
+  border-top: 1px solid var(--mist);
+}
+
+.result-why strong {
+  font-size: 13px;
+  color: var(--label);
+}
+
+.result-why ul {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.hand-end-cards {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.history-row.static {
+  display: block;
+  cursor: default;
+}
+
+.next-bar .btn.large {
+  min-width: 220px;
+}
+
+@keyframes card-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+}
+
+@keyframes stamp {
+  from {
+    opacity: 0;
+    transform: scale(1.8) rotate(-6deg);
+  }
+}
+
+@keyframes grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-streak strong.bump,
+  .result-card,
+  .result-grade,
+  .result-streak,
+  .result-bars .advice-bar-track span {
+    animation: none;
+  }
+}
+
+/* 自分の手札は卓の主役なので、ほかの席より大きく置く */
+.seat.hero .seat-cards {
+  margin-bottom: -14px;
+}
+
+.seat.hero .seat-cards .playing-card,
+.seat.hero .seat-cards .card-slot {
+  width: 50px;
+  height: 70px;
+  font-size: 24px;
+}
+
+/* ---------- 教材 ---------- */
+
+.view.game .learn-layout {
+  flex: 1;
+  align-items: stretch;
+  gap: 24px;
+  min-height: 0;
+}
+
+.view.game .learn-toc {
+  position: static;
+  align-self: stretch;
+  padding: 16px 8px;
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.reader {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.reader-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  padding: 48px 40px 32px;
+  overflow: auto;
+}
+
+.reader .reading {
+  gap: 28px;
+  width: 100%;
+  /* 上下も中央に置き、短いページがスライドのように見えるようにする。長いページは上から普通にスクロールする */
+  margin: auto;
+  animation: page-in 0.25s ease-out both;
+}
+
+.reader .reading.wide {
+  max-width: none;
+}
+
+.reader .learn-tools {
+  padding-top: 0;
+  border-top: none;
+}
+
+.reader-nav {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--line);
+}
+
+.page-dots {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.page-dots button {
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  background: var(--line-strong);
+  border: none;
+  border-radius: 999px;
+  transition:
+    width 0.2s ease,
+    background 0.2s ease;
+}
+
+.page-dots button.done {
+  background: var(--sub);
+}
+
+.page-dots button[aria-current='step'] {
+  width: 28px;
+  background: var(--accent);
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+}
+
+@media (max-width: 1000px) {
+  .view.game .learn-toc {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reader .reading {
+    animation: none;
+  }
+}
+
+.reader .prose-aside,
+.reader .formula,
+.reader .reading-points,
+.reader .reading-example {
+  background: var(--bg-subtle);
+}

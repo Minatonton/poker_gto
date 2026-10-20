@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { actionColor, formatPercent } from '../components/actionColors'
-import { BoardCards, PlayingCard } from '../components/postflop/Cards'
+import { BoardCards } from '../components/postflop/Cards'
+import { GameScreen, type DockTab } from '../components/game/GameScreen'
+import { playCue } from '../components/game/sound'
 import { PokerTable, type SeatView } from '../components/table/PokerTable'
 import { preflopSeats } from '../components/table/preflopSeats'
 import { Segmented } from '../components/Segmented'
@@ -24,7 +26,12 @@ import {
 } from '../trainer/progress'
 import { ActionBar } from '../components/table/ActionBar'
 import { dealNextCard, dealPostflopHands, villainAction } from '../trainer/postflopHand'
-import { createPreflopQuestion, PREFLOP_DRILLS, type PreflopDrillKind, type PreflopQuestion } from '../trainer/preflopDrill'
+import {
+  createPreflopQuestion,
+  PREFLOP_DRILLS,
+  type PreflopDrillKind,
+  type PreflopQuestion,
+} from '../trainer/preflopDrill'
 import { explainPostflop, explainPreflop } from '../trainer/explain'
 import { equityVsRange } from '../poker/equity'
 import { dealerOf, seatOf, seatsFromBottom, tableState } from '../poker/table'
@@ -63,85 +70,135 @@ interface Props {
   onOpenAnalyze: () => void
 }
 
+/** 出題の種類ごとの画面に共通して渡すもの */
+interface ShellProps {
+  useRng: boolean
+  progress: Progress
+  onGrade: (grade: Grade) => void
+  /** 出題タブの先頭に置く、出題の種類と RNG の設定 */
+  settings: ReactNode
+  statsTab: DockTab
+}
+
+const isGood = (grade: Grade) => grade === 'best' || grade === 'correct'
+const STREAK_CUE_FROM = 3
+
 export function TrainerPage({ solution, solvedSpot, onOpenAnalyze }: Props) {
   const [mode, setMode] = useState<Mode>('preflop')
   const [useRng, setUseRng] = useState(false)
   const [stats, setStats] = useState(loadStats)
+  const progress = stats[mode]
 
-  const record = (grade: Grade) =>
-    setStats((current) => {
-      const next = { ...current, [mode]: recordAnswer(current[mode], grade) }
-      saveStats(next)
-      return next
-    })
+  const record = (grade: Grade) => {
+    const next = { ...stats, [mode]: recordAnswer(stats[mode], grade) }
+    saveStats(next)
+    setStats(next)
+    playCue(!isGood(grade) ? 'bad' : next[mode].streak >= STREAK_CUE_FROM ? 'streak' : 'good')
+  }
+  const reset = () => {
+    const next = { ...stats, [mode]: emptyProgress() }
+    saveStats(next)
+    setStats(next)
+  }
 
-  return (
-    <>
-      <section className="card">
-        <div className="card-body scenario inline">
-          <Segmented<Mode>
-            label="出題"
-            options={[
-              { value: 'preflop', label: 'プリフロップ' },
-              { value: 'postflop', label: 'ポストフロップ' },
-            ]}
-            value={mode}
-            onChange={setMode}
-          />
-          <label className="checkbox-row">
-            <input type="checkbox" checked={useRng} onChange={(e) => setUseRng(e.target.checked)} />
-            RNG を使う
-            <span className="muted small">出目に当たるアクションだけを Best にして、混合戦略を頻度どおりに選ぶ練習</span>
-          </label>
-        </div>
-      </section>
-
-      <div className="trainer-layout">
-        <div className="trainer-main">
-          {mode === 'preflop' ? (
-            <PreflopTrainer solution={solution} useRng={useRng} onGrade={record} />
-          ) : solvedSpot ? (
-            <PostflopTrainer spot={solvedSpot} useRng={useRng} onGrade={record} />
-          ) : (
-            <section className="card empty-state">
-              <p>ポストフロップの出題には、先に「分析」でフロップまで進み、そのスポットをソルブしてください。</p>
-              <button className="btn primary" onClick={onOpenAnalyze}>
-                分析を開く
-              </button>
-            </section>
-          )}
-        </div>
-        <ProgressCard
-          progress={stats[mode]}
-          onReset={() => {
-            const next = { ...stats, [mode]: emptyProgress() }
-            saveStats(next)
-            setStats(next)
-          }}
+  const shell: ShellProps = {
+    useRng,
+    progress,
+    onGrade: record,
+    settings: (
+      <>
+        <Segmented<Mode>
+          label="出題"
+          options={[
+            { value: 'preflop', label: 'プリフロップ' },
+            { value: 'postflop', label: 'ポストフロップ' },
+          ]}
+          value={mode}
+          onChange={setMode}
         />
+        <label className="checkbox-row">
+          <input type="checkbox" checked={useRng} onChange={(e) => setUseRng(e.target.checked)} />
+          RNG を使う
+          <span className="muted small">出目に当たるアクションだけを Best にして、混合戦略を頻度どおりに選ぶ練習</span>
+        </label>
+      </>
+    ),
+    statsTab: { id: 'stats', label: '成績', content: <ProgressCard progress={progress} onReset={reset} /> },
+  }
+
+  if (mode === 'preflop') return <PreflopTrainer solution={solution} {...shell} />
+  if (solvedSpot) return <PostflopTrainer spot={solvedSpot} {...shell} />
+  return (
+    <GameScreen
+      coach={<strong>ポストフロップの出題には、先に「分析」でフロップを計算してください。</strong>}
+      hud={<TrainerHud progress={progress} />}
+      table={<div className="stage-empty">計算したスポットで、GTO を相手に1ハンドずつ打てます。</div>}
+      controls={
+        <div className="finished-actions">
+          <button className="btn primary large" onClick={onOpenAnalyze}>
+            分析を開く
+          </button>
+        </div>
+      }
+      tabs={[settingsTab(shell.settings), shell.statsTab]}
+    />
+  )
+}
+
+function settingsTab(children: ReactNode): DockTab {
+  return {
+    id: 'settings',
+    label: '出題',
+    content: (
+      <section className="card">
+        <div className="card-body scenario">{children}</div>
+      </section>
+    ),
+  }
+}
+
+/** 卓の右上に置く、連続正解と今日の問題数。数字が変わった瞬間だけ跳ねさせる */
+function TrainerHud({ progress }: { progress: Progress }) {
+  const today = todayCount(progress)
+  return (
+    <div className="trainer-hud">
+      <div className="hud-streak" title={`最高 ${progress.bestStreak}`}>
+        <span className="hud-label">連続正解</span>
+        <strong key={progress.streak} className={`num ${progress.streak > 0 ? 'bump' : ''}`}>
+          {progress.streak}
+        </strong>
       </div>
-    </>
+      <div className="hud-daily">
+        <span className="hud-label">
+          今日 <strong className="num">{today}</strong> / {DAILY_GOAL}
+        </span>
+        <span className={`hud-daily-track ${today >= DAILY_GOAL ? 'done' : ''}`}>
+          <span style={{ width: `${Math.min(1, today / DAILY_GOAL) * 100}%` }} />
+        </span>
+      </div>
+    </div>
   )
 }
 
 const rollRng = () => Math.random()
 
+type PreflopAnswer = { chosen: number; grade: Grade; explanation: string[] }
+
 function PreflopTrainer({
   solution,
   useRng,
+  progress,
   onGrade,
-}: {
-  solution: PreflopSolution
-  useRng: boolean
-  onGrade: (grade: Grade) => void
-}) {
+  settings,
+  statsTab,
+}: ShellProps & { solution: PreflopSolution }) {
   const [kind, setKind] = useState<PreflopDrillKind>('rfi')
   const [seat, setSeat] = useState<Position | 'random'>('random')
   const [question, setQuestion] = useState<PreflopQuestion | null>(null)
   const [rng, setRng] = useState(rollRng)
-  const [answer, setAnswer] = useState<{ chosen: number; grade: Grade; explanation: string[] } | null>(null)
+  const [answer, setAnswer] = useState<PreflopAnswer | null>(null)
   const [error, setError] = useState('')
-  const [showRange, setShowRange] = useState(false)
+  const [tab, setTab] = useState('stats')
 
   const next = useCallback(
     (nextKind = kind, nextSeat = seat) => {
@@ -149,8 +206,8 @@ function PreflopTrainer({
       setError(created ? '' : 'この席には、この種類の手番が来ません。席か出題の種類を変えてください。')
       setQuestion(created)
       setAnswer(null)
-      setShowRange(false)
       setRng(rollRng())
+      setTab((current) => (current === 'range' ? 'stats' : current))
     },
     [kind, seat, solution],
   )
@@ -166,73 +223,101 @@ function PreflopTrainer({
     if (!question || answer) return
     const grade = gradeByFrequency(frequencies, index, useRng ? rng : undefined)
     setAnswer({ chosen: index, grade, explanation: preflopExplanation(question, frequencies, index) })
+    setTab('range')
     onGrade(grade)
   }
 
+  const walk = question?.walk
+  const table = walk && preflopSeats(walk.steps, walk.positions, walk.position, walk.position, question.cards)
+
   return (
-    <>
-      <section className="card">
-        <div className="card-body scenario">
-          <Segmented<PreflopDrillKind>
-            label="種類"
-            options={PREFLOP_DRILLS.map((d) => ({ value: d.kind, label: d.label }))}
-            value={kind}
-            onChange={(value) => {
-              setKind(value)
-              next(value, seat)
-            }}
+    <GameScreen
+      coach={
+        error ? (
+          <span className="error">{error}</span>
+        ) : question ? (
+          <>
+            <strong>{question.walk.position} のあなたの番。</strong>
+            {question.hand} をどうしますか？
+            {useRng && <span className="rng">RNG {Math.floor(rng * 100)}</span>}
+          </>
+        ) : null
+      }
+      hud={<TrainerHud progress={progress} />}
+      table={
+        table ? (
+          <PokerTable
+            key={question.choices.join() + question.hand}
+            seats={table.seats}
+            pot={table.pot}
+            overlay={
+              answer && (
+                <ResultCard
+                  grade={answer.grade}
+                  streak={progress.streak}
+                  actions={question.walk.strategy.actions}
+                  frequencies={frequencies}
+                  chosen={answer.chosen}
+                  rngAction={useRng ? actionForRng(frequencies, rng) : undefined}
+                  explanation={answer.explanation}
+                />
+              )
+            }
           />
-          <Segmented<Position | 'random'>
-            label="自分の席"
-            options={[{ value: 'random', label: 'ランダム' }, ...solution.positions.map((p) => ({ value: p, label: p }))]}
-            value={seat}
-            onChange={(value) => {
-              setSeat(value)
-              next(kind, value)
-            }}
-          />
-        </div>
-      </section>
-
-      {error && (
-        <section className="card">
-          <p className="empty-note">{error}</p>
-        </section>
-      )}
-
-      {question && (
-        <section className="card table-card">
-          <PreflopQuestionTable question={question} />
-          <Question
-            actor={question.walk.position}
-            actions={question.walk.strategy.actions}
-            rng={useRng ? rng : undefined}
-            answered={answer !== null}
-            onChoose={choose}
-          />
-          {answer && (
-            <Feedback
-              grade={answer.grade}
-              actions={question.walk.strategy.actions}
-              frequencies={frequencies}
-              chosen={answer.chosen}
-              rngAction={useRng ? actionForRng(frequencies, rng) : undefined}
-              explanation={answer.explanation}
-              onNext={() => next()}
-              extra={
-                <button className="btn" onClick={() => setShowRange(!showRange)}>
-                  {showRange ? 'レンジ全体を閉じる' : 'レンジ全体を見る'}
-                </button>
-              }
+        ) : (
+          <div className="stage-empty">出題タブで、席か出題の種類を変えてください。</div>
+        )
+      }
+      controls={
+        question && !answer ? (
+          <ActionBar actions={question.walk.strategy.actions} onChoose={choose} />
+        ) : (
+          <NextBar label="次の問題" onNext={() => next()} />
+        )
+      }
+      tabs={[
+        statsTab,
+        settingsTab(
+          <>
+            {settings}
+            <Segmented<PreflopDrillKind>
+              label="種類"
+              options={PREFLOP_DRILLS.map((d) => ({ value: d.kind, label: d.label }))}
+              value={kind}
+              onChange={(value) => {
+                setKind(value)
+                next(value, seat)
+              }}
             />
-          )}
-        </section>
-      )}
-
-      {question && answer && showRange && (
-        <StudyView key={question.choices.join()} strategy={question.walk.strategy} heroHand={question.hand} />
-      )}
-    </>
+            <Segmented<Position | 'random'>
+              label="自分の席"
+              options={[
+                { value: 'random', label: 'ランダム' },
+                ...solution.positions.map((p) => ({ value: p, label: p })),
+              ]}
+              value={seat}
+              onChange={(value) => {
+                setSeat(value)
+                next(kind, value)
+              }}
+            />
+          </>,
+        ),
+        ...(question && answer
+          ? [
+              {
+                id: 'range',
+                label: 'レンジ',
+                content: (
+                  <StudyView key={question.choices.join()} strategy={question.walk.strategy} heroHand={question.hand} />
+                ),
+              },
+            ]
+          : []),
+      ]}
+      activeTab={tab}
+      onTabChange={setTab}
+    />
   )
 }
 
@@ -270,89 +355,17 @@ function preflopExplanation(question: PreflopQuestion, frequencies: number[], ch
   })
 }
 
-function PreflopQuestionTable({ question }: { question: PreflopQuestion }) {
-  const { walk } = question
-  const { seats, pot } = preflopSeats(walk.steps, walk.positions, walk.position, walk.position, question.cards)
-  return <PokerTable seats={seats} pot={pot} />
-}
-
-function Question({
-  actor,
-  cards,
-  board,
-  actions,
-  rng,
-  answered,
-  onChoose,
-}: {
-  actor: string
-  /** 卓に手札とボードを出しているときは省く */
-  cards?: [string, string]
-  board?: string[]
-  actions: Action[]
-  rng?: number
-  answered: boolean
-  onChoose: (index: number) => void
-}) {
-  return (
-    <div className="question">
-      <div className="question-hand">
-        <span className="muted small">{actor} の手番</span>
-        {cards && (
-          <span className="question-cards">
-            {cards.map((card) => (
-              <PlayingCard key={card} card={card} />
-            ))}
-          </span>
-        )}
-        {board && board.length > 0 && (
-          <span className="question-board">
-            <span className="muted small">ボード</span>
-            <BoardCards cards={displayBoard(board)} />
-          </span>
-        )}
-        {rng !== undefined && <span className="rng">RNG {Math.floor(rng * 100)}</span>}
-      </div>
-      {/* 答えたあとはボタンを消し、同じ場所に採点を出す。視線を動かさずに結果が見えるように */}
-      {!answered && <ActionBar actions={actions} onChoose={onChoose} />}
-    </div>
-  )
-}
-
-function Feedback({
-  grade,
-  actions,
-  frequencies,
-  evs,
-  evLoss,
-  chosen,
-  rngAction,
-  onNext,
-  nextLabel = '次の問題',
-  extra,
-  explanation,
-}: {
-  grade: Grade
-  actions: Action[]
-  frequencies: number[]
-  evs?: number[]
-  evLoss?: number
-  chosen: number
-  rngAction?: number
-  onNext: () => void
-  nextLabel?: string
-  extra?: React.ReactNode
-  /** なぜそのアクションが正解なのかの説明 */
-  explanation?: string[]
-}) {
-  const info = GRADES.find((g) => g.grade === grade)!
+/** 次へ進むボタン。答えたあとは Enter かスペースでも進めるようにして、手をキーボードから離さずに続けられるようにする */
+function NextBar({ label, onNext, disabled = false }: { label: string; onNext: () => void; disabled?: boolean }) {
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    ref.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
-  }, [])
-  useEffect(() => {
+    if (disabled) return
     const onKey = (event: KeyboardEvent) => {
+      // 分析と壁打ちは切り替えても画面に残しているため、見えていない画面のボタンはキーに反応させない
       if (!ref.current || ref.current.offsetParent === null) return
+      const target = event.target as HTMLElement | null
+      // ボタンにフォーカスがあっても Enter は「次へ」に使う。タブを押した直後に Enter が効かなくなるのを防ぐため
+      if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault()
         onNext()
@@ -360,37 +373,66 @@ function Feedback({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onNext])
+  }, [onNext, disabled])
   return (
-    <div className={`feedback grade-${grade}`} ref={ref}>
-      <div className="feedback-head">
-        <strong>{info.label}</strong>
-        <span className="muted small">{info.description}</span>
-        {evLoss !== undefined && evLoss > 0 && <span className="num small">EV の損失 {evLoss.toFixed(2)}bb</span>}
+    <div className="finished-actions next-bar" ref={ref}>
+      <button className="btn primary large" onClick={onNext} disabled={disabled}>
+        {label} <kbd className="action-key">Enter</kbd>
+      </button>
+    </div>
+  )
+}
+
+/** 答えた直後に卓の上へ重ねる採点。最初に評価を大きく見せ、頻度と理由をその下に続ける */
+function ResultCard({
+  grade,
+  streak,
+  actions,
+  frequencies,
+  evs,
+  evLoss,
+  chosen,
+  rngAction,
+  explanation,
+}: {
+  grade: Grade
+  streak: number
+  actions: Action[]
+  frequencies: number[]
+  evs?: number[]
+  evLoss?: number
+  chosen: number
+  rngAction?: number
+  explanation: string[]
+}) {
+  const info = GRADES.find((g) => g.grade === grade)!
+  return (
+    <div className={`result-card grade-${grade}`} role="status">
+      <div className="result-head">
+        <strong className="result-grade">{info.label}</strong>
+        <span className="result-description">{info.description}</span>
+        {isGood(grade) && streak >= 2 && <span className="result-streak num">{streak} 連続</span>}
       </div>
-      <ul className="action-list">
-        <li className={`action-row static head ${evs ? 'with-ev' : ''}`}>
-          <span />
-          <span>アクション</span>
-          <span className="num">頻度</span>
-          {evs && <span className="num">EV</span>}
-        </li>
+      {evLoss !== undefined && evLoss > 0 && <p className="result-loss num">EV の損失 {evLoss.toFixed(2)}bb</p>}
+      <ul className="advice-bars result-bars">
         {actions.map((action, index) => (
-          <li key={action.label} className={`action-row static ${evs ? 'with-ev' : ''} ${index === chosen ? 'focused' : ''}`}>
-            <span className="swatch" style={{ background: actionColor(action) }} />
-            <span>
+          <li key={action.label} className={index === chosen ? 'chosen' : ''}>
+            <span className="advice-bar-label">
               {action.label}
-              {index === chosen && <span className="muted small">（選択）</span>}
-              {index === rngAction && <span className="muted small">（RNG の正解）</span>}
+              {index === chosen && <span className="muted small"> あなた</span>}
+              {index === rngAction && <span className="muted small"> RNG</span>}
+            </span>
+            <span className="advice-bar-track">
+              <span style={{ width: `${(frequencies[index] ?? 0) * 100}%`, background: actionColor(action) }} />
             </span>
             <span className="num">{formatPercent(frequencies[index] ?? 0)}</span>
-            {evs && <span className="num muted">{evs[index].toFixed(2)}</span>}
+            {evs && <span className="num muted advice-ev">{evs[index].toFixed(2)}bb</span>}
           </li>
         ))}
       </ul>
-      {explanation && explanation.length > 0 && (
-        <div className="explanation">
-          <strong>{grade === 'best' ? '解説' : 'なぜ別のアクションを選ぶべきか'}</strong>
+      {explanation.length > 0 && (
+        <div className="result-why">
+          <strong>{isGood(grade) ? '解説' : 'なぜ別のアクションを選ぶべきか'}</strong>
           <ul>
             {explanation.map((line, i) => (
               <li key={i}>{line}</li>
@@ -398,12 +440,6 @@ function Feedback({
           </ul>
         </div>
       )}
-      <div className="finished-actions">
-        <button className="btn primary" onClick={onNext}>
-          {nextLabel} <kbd className="action-key">Enter</kbd>
-        </button>
-        {extra}
-      </div>
     </div>
   )
 }
@@ -469,21 +505,13 @@ interface HandState {
   log: string[]
 }
 
-function PostflopTrainer({
-  spot,
-  useRng,
-  onGrade,
-}: {
-  spot: PostflopSpot
-  useRng: boolean
-  onGrade: (grade: Grade) => void
-}) {
+type PostflopAnswer = { chosen: number; grade: Grade; evLoss: number; explanation: string[] }
+
+function PostflopTrainer({ spot, useRng, progress, onGrade, settings, statsTab }: ShellProps & { spot: PostflopSpot }) {
   const clientRef = useRef(new SolverClient())
   const [sideChoice, setSideChoice] = useState<'oop' | 'ip' | 'random'>('random')
   const [hand, setHand] = useState<HandState | null>(null)
-  const [answer, setAnswer] = useState<{ chosen: number; grade: Grade; evLoss: number; explanation: string[] } | null>(
-    null,
-  )
+  const [answer, setAnswer] = useState<PostflopAnswer | null>(null)
   const [rng, setRng] = useState(rollRng)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -522,6 +550,7 @@ function PostflopTrainer({
       if (!dealt) throw new Error('手札を配れませんでした')
       setHand(await advance({ heroSide, ...dealt, history: [], log: [] }))
       setRng(rollRng())
+      playCue('deal')
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -530,7 +559,8 @@ function PostflopTrainer({
   }
 
   const heroNode = hand?.node.kind === 'player' ? hand.node : null
-  const heroCombo = heroNode && hand ? heroNode.hands.find((h) => isSameHoleCards(h.cards, hand.hero.join(''))) : undefined
+  const heroCombo =
+    heroNode && hand ? heroNode.hands.find((h) => isSameHoleCards(h.cards, hand.hero.join(''))) : undefined
   const actions = heroNode ? toActions(heroNode.actions, heroNode.pot) : []
   const evs = heroCombo ? heroCombo.actionEvs.map((ev) => toBb(ev ?? 0)) : []
   // 自分が頻度0のアクションを選んだ後は、そのハンドの到達確率が0になり EV が出ないため、頻度だけで採点する
@@ -583,84 +613,118 @@ function PostflopTrainer({
     }
   }
 
-  return (
+  const lastLog = hand?.log.at(-1)
+  const coach = error ? (
+    <span className="error">{error}</span>
+  ) : !hand ? (
     <>
-      <section className="card">
-        <div className="card-body scenario">
-          <p className="muted small">
-            出題するスポット: {spot.name}。相手は自分の手札の GTO 戦略どおりに動き、ターンとリバーはランダムに配られます。
-          </p>
-          <Segmented<'oop' | 'ip' | 'random'>
-            label="自分の側"
-            options={[
-              { value: 'random', label: 'ランダム' },
-              { value: 'oop', label: `${spot.oop}（OOP）` },
-              { value: 'ip', label: `${spot.ip}（IP）` },
-            ]}
-            value={sideChoice}
-            onChange={setSideChoice}
-          />
-          <div>
-            <button className="btn primary" onClick={start} disabled={busy}>
-              {hand ? '次のハンドを配る' : 'ハンドを配る'}
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {error && (
-        <section className="card">
-          <p className="empty-note error">{error}</p>
-        </section>
-      )}
-
-      {hand && (
-        <section className="card table-card">
-          <PokerTable
-            seats={postflopSeats(spot, hand)}
-            pot={toBb(hand.node.pot)}
-            board={displayBoard(hand.node.board)}
-          />
-          {hand.log.length > 0 && (
-            <div className="action-line">
-              {hand.log.map((entry, i) => (
-                <span key={i} className="step static log-step">
-                  <span className="step-action">{entry}</span>
-                </span>
-              ))}
-            </div>
-          )}
-          {heroNode ? (
-            <>
-              <Question
-                actor={`${position(hand.heroSide)}（自分）`}
-                actions={actions}
-                rng={useRng ? rng : undefined}
-                answered={answer !== null}
-                onChoose={choose}
-              />
-              {answer && heroCombo && (
-                <Feedback
-                  grade={answer.grade}
-                  actions={actions}
-                  frequencies={heroCombo.strategy}
-                  evs={evAvailable ? evs : undefined}
-                  evLoss={answer.evLoss}
-                  chosen={answer.chosen}
-                  rngAction={useRng ? actionForRng(heroCombo.strategy, rng) : undefined}
-                  explanation={answer.explanation}
-                  onNext={proceed}
-                  nextLabel="続ける"
-                />
-              )}
-            </>
-          ) : (
-            <HandEnd hand={hand} spot={spot} onNext={start} />
-          )}
-        </section>
-      )}
+      <strong>{spot.name} を打ちます。</strong>相手は GTO どおりに動き、ターンとリバーはランダムに配られます。
     </>
+  ) : heroNode ? (
+    <>
+      <strong>{position(hand.heroSide)} のあなたの番。</strong>
+      {lastLog && <span className="coach-hint">直前: {lastLog}</span>}
+      {useRng && <span className="rng">RNG {Math.floor(rng * 100)}</span>}
+    </>
+  ) : (
+    <strong>
+      ハンド終了{hand.log.some((entry) => entry.endsWith('Fold')) ? '（フォールド）' : '（ショーダウン）'}
+    </strong>
   )
+
+  return (
+    <GameScreen
+      coach={coach}
+      hud={<TrainerHud progress={progress} />}
+      table={
+        <PokerTable
+          seats={hand ? postflopSeats(spot, hand) : idleSeats(spot)}
+          pot={hand ? toBb(hand.node.pot) : spot.potBb}
+          board={hand ? displayBoard(hand.node.board) : []}
+          overlay={
+            answer && heroCombo ? (
+              <ResultCard
+                grade={answer.grade}
+                streak={progress.streak}
+                actions={actions}
+                frequencies={heroCombo.strategy}
+                evs={evAvailable ? evs : undefined}
+                evLoss={answer.evLoss}
+                chosen={answer.chosen}
+                rngAction={useRng ? actionForRng(heroCombo.strategy, rng) : undefined}
+                explanation={answer.explanation}
+              />
+            ) : (
+              hand && !heroNode && <HandEnd hand={hand} spot={spot} />
+            )
+          }
+        />
+      }
+      controls={
+        !hand ? (
+          <NextBar label="ハンドを配る" onNext={start} disabled={busy} />
+        ) : heroNode && !answer ? (
+          <ActionBar actions={actions} onChoose={choose} disabled={busy} />
+        ) : answer ? (
+          <NextBar label="続ける" onNext={proceed} disabled={busy} />
+        ) : (
+          <NextBar label="次のハンドを配る" onNext={start} disabled={busy} />
+        )
+      }
+      tabs={[
+        statsTab,
+        settingsTab(
+          <>
+            {settings}
+            <Segmented<'oop' | 'ip' | 'random'>
+              label="自分の側"
+              options={[
+                { value: 'random', label: 'ランダム' },
+                { value: 'oop', label: `${spot.oop}（OOP）` },
+                { value: 'ip', label: `${spot.ip}（IP）` },
+              ]}
+              value={sideChoice}
+              onChange={setSideChoice}
+            />
+          </>,
+        ),
+        {
+          id: 'history',
+          label: '履歴',
+          content: (
+            <section className="card">
+              <header className="card-header">このハンドの流れ</header>
+              <ol className="history-list">
+                {(hand?.log ?? []).length === 0 && (
+                  <li className="muted small history-empty">まだアクションはありません</li>
+                )}
+                {hand?.log.map((entry, i) => (
+                  <li key={i} className="history-row static">
+                    {entry}
+                  </li>
+                ))}
+              </ol>
+            </section>
+          ),
+        },
+      ]}
+    />
+  )
+}
+
+/** 配る前の卓。ハンドに参加する2人だけを座らせておく */
+function idleSeats(spot: PostflopSpot): SeatView[] {
+  const dealer = dealerOf(spot.positions)
+  return seatsFromBottom(spot.positions, spot.ip).map((position) => ({
+    position,
+    dealer: position === dealer,
+    stack: position === spot.oop || position === spot.ip ? spot.effectiveStackBb : null,
+    bet: 0,
+    folded: position !== spot.oop && position !== spot.ip,
+    acting: false,
+    hero: false,
+    cards: null,
+  }))
 }
 
 /** ポストフロップの卓。ハンドに参加している2人以外はフォールド済みとして並べ、ハンドが終わったら相手の手札も開く */
@@ -685,27 +749,21 @@ function postflopSeats(spot: PostflopSpot, hand: HandState): SeatView[] {
 }
 
 /** 学習用なので、勝敗ではなく判断の採点だけを見せる。終わったハンドは両者の手札とボードの確認だけにする */
-function HandEnd({ hand, spot, onNext }: { hand: HandState; spot: PostflopSpot; onNext: () => void }) {
-  const folded = hand.log.some((entry) => entry.endsWith('Fold'))
+function HandEnd({ hand, spot }: { hand: HandState; spot: PostflopSpot }) {
   return (
-    <div className="question">
-      <div className="question-hand">
-        <span className="muted small">ハンド終了{folded ? '（フォールド）' : '（ショーダウン）'}</span>
-        <span className="question-board">
-          <span className="muted small">自分</span>
-          <BoardCards cards={hand.hero} />
-          <span className="muted small">相手（{hand.heroSide === 0 ? spot.ip : spot.oop}）</span>
-          <BoardCards cards={hand.villain} />
-        </span>
-        <span className="question-board">
-          <span className="muted small">ボード</span>
-          <BoardCards cards={displayBoard(hand.node.board)} />
-        </span>
+    <div className="result-card hand-end" role="status">
+      <div className="result-head">
+        <strong className="result-grade">ハンド終了</strong>
       </div>
-      <div className="finished-actions">
-        <button className="btn primary" onClick={onNext}>
-          次のハンドを配る
-        </button>
+      <div className="hand-end-cards">
+        <span className="muted small">あなた</span>
+        <BoardCards cards={hand.hero} />
+        <span className="muted small">相手（{hand.heroSide === 0 ? spot.ip : spot.oop}）</span>
+        <BoardCards cards={hand.villain} />
+      </div>
+      <div className="hand-end-cards">
+        <span className="muted small">ボード</span>
+        <BoardCards cards={displayBoard(hand.node.board)} />
       </div>
     </div>
   )
