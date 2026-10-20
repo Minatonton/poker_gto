@@ -40,10 +40,38 @@ import { dealerOf, seatOf, seatsFromBottom, tableState } from '../poker/table'
 import { classifyHand } from '../poker/handCategory'
 import { breakdownNode } from '../solver/breakdown'
 import { SESSION_SIZE, summarize, type SessionAnswer } from '../trainer/session'
+import {
+  addMistake,
+  mistakeOf,
+  normalizeMistakes,
+  questionFromMistake,
+  removeMistake,
+  type Mistake,
+} from '../trainer/mistakes'
 
 type Mode = 'preflop' | 'postflop'
 
 const STATS_KEY = 'poker-gto:trainer-stats'
+const MISTAKES_KEY = 'poker-gto:mistakes'
+
+/** 間違えた問題も成績と同じく端末にだけ残す。消えても復習の候補が減るだけなので、失敗は無視する */
+function loadMistakes(): Mistake[] {
+  try {
+    return normalizeMistakes(JSON.parse(localStorage.getItem(MISTAKES_KEY) ?? 'null'))
+  } catch {
+    return []
+  }
+}
+
+function saveMistakes(mistakes: Mistake[]) {
+  try {
+    localStorage.setItem(MISTAKES_KEY, JSON.stringify(mistakes))
+  } catch {
+    // 同上
+  }
+}
+
+type PreflopKind = PreflopDrillKind | 'review'
 
 /** 成績は端末のブラウザにだけ残す。消えても困らない練習の記録なので、読み書きに失敗しても無視する */
 function loadStats(): Record<Mode, Progress> {
@@ -291,6 +319,12 @@ function SessionCard({ answers, progress }: { answers: SessionAnswer[]; progress
 
 const rollRng = () => Math.random()
 
+/** 間違えた問題から1つ選ぶ。続けて同じ問題にならないよう、ランダムに選ぶ */
+function reviewQuestion(solution: PreflopSolution, mistakes: Mistake[]): PreflopQuestion | null {
+  const playable = mistakes.flatMap((m) => questionFromMistake(solution, m) ?? [])
+  return playable[Math.floor(Math.random() * playable.length)] ?? null
+}
+
 /** レイズの額が GTO と違うときの説明。相手は、オープンなら BB、レイズを受けているならレイズした人 */
 function sizeExplanation(question: PreflopQuestion, chosenAmount: number, gtoAmount: number): string[] {
   const { steps, positions, position } = question.walk
@@ -327,7 +361,10 @@ function PreflopTrainer({
   gate,
   summary,
 }: ShellProps & { solution: PreflopSolution }) {
-  const [kind, setKind] = useState<PreflopDrillKind>('rfi')
+  const [kind, setKind] = useState<PreflopKind>('rfi')
+  const [mistakes, setMistakes] = useState(loadMistakes)
+  const players = solution.positions.length
+  const reviewable = mistakes.filter((m) => m.players === players)
   const [seat, setSeat] = useState<Position | 'random'>('random')
   const [question, setQuestion] = useState<PreflopQuestion | null>(null)
   const [rng, setRng] = useState(rollRng)
@@ -336,15 +373,24 @@ function PreflopTrainer({
   const [tab, setTab] = useState('stats')
 
   const next = useCallback(
-    (nextKind = kind, nextSeat = seat) => {
-      const created = createPreflopQuestion(solution, nextKind, nextSeat === 'random' ? null : nextSeat)
-      setError(created ? '' : 'この席には、この種類の手番が来ません。席か出題の種類を変えてください。')
+    (nextKind: PreflopKind = kind, nextSeat = seat) => {
+      const created =
+        nextKind === 'review'
+          ? reviewQuestion(solution, reviewable)
+          : createPreflopQuestion(solution, nextKind, nextSeat === 'random' ? null : nextSeat)
+      setError(
+        created
+          ? ''
+          : nextKind === 'review'
+            ? '復習する問題はありません。間違えた問題がここにたまります。'
+            : 'この席には、この種類の手番が来ません。席か出題の種類を変えてください。',
+      )
       setQuestion(created)
       setAnswer(null)
       setRng(rollRng())
       setTab((current) => (current === 'range' ? 'stats' : current))
     },
-    [kind, seat, solution],
+    [kind, seat, solution, reviewable],
   )
 
   useEffect(() => {
@@ -376,6 +422,16 @@ function PreflopTrainer({
     })
     setTab('range')
     onGrade(grade)
+    const mistake = mistakeOf(players, question)
+    const nextMistakes = isGood(grade)
+      ? kind === 'review'
+        ? removeMistake(mistakes, mistake)
+        : mistakes
+      : addMistake(mistakes, mistake)
+    if (nextMistakes !== mistakes) {
+      setMistakes(nextMistakes)
+      saveMistakes(nextMistakes)
+    }
   }
 
   const walk = question?.walk
@@ -388,6 +444,7 @@ function PreflopTrainer({
           <span className="error">{error}</span>
         ) : question ? (
           <>
+            {kind === 'review' && <span className="coach-tag">復習</span>}
             <strong>{question.walk.position} のあなたの番。</strong>
             {question.hand} をどうしますか？
             {useRng && <span className="rng">RNG {Math.floor(rng * 100)}</span>}
@@ -437,9 +494,12 @@ function PreflopTrainer({
         settingsTab(
           <>
             {settings}
-            <Segmented<PreflopDrillKind>
+            <Segmented<PreflopKind>
               label="種類"
-              options={PREFLOP_DRILLS.map((d) => ({ value: d.kind, label: d.label }))}
+              options={[
+                ...PREFLOP_DRILLS.map((d) => ({ value: d.kind, label: d.label })),
+                { value: 'review', label: `間違えた問題（${reviewable.length}）` },
+              ]}
               value={kind}
               onChange={(value) => {
                 setKind(value)

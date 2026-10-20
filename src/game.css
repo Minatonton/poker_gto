@@ -1228,3 +1228,12 @@ main.page {
   flex-wrap: wrap;
   width: auto;
 }
+
+.coach-tag {
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--on-accent);
+  background: var(--grade-inaccuracy);
+  border-radius: 999px;
+}
