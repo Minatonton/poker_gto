@@ -903,3 +903,176 @@ main.page {
     transition: none;
   }
 }
+
+/* ---------- ランクとチャレンジ ---------- */
+
+.hud-rank {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 96px;
+}
+
+.hud-rank-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  animation: pop-in 0.3s ease-out both;
+}
+
+.hud-rank-track {
+  height: 4px;
+  overflow: hidden;
+  background: var(--mist);
+  border-radius: 999px;
+}
+
+.hud-rank-track span {
+  display: block;
+  height: 100%;
+  background: var(--grade-inaccuracy);
+  transition: width 0.5s ease-out;
+}
+
+.session-dots {
+  display: flex;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.session-dots li {
+  width: 9px;
+  height: 9px;
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+}
+
+.session-dots li[class^='grade-'] {
+  border-color: transparent;
+  animation: chip-in 0.3s ease-out both;
+}
+
+.session-dots .grade-best {
+  background: var(--grade-best);
+}
+
+.session-dots .grade-correct {
+  background: var(--grade-correct);
+}
+
+.session-dots .grade-inaccuracy {
+  background: var(--grade-inaccuracy);
+}
+
+.session-dots .grade-wrong {
+  background: var(--grade-wrong);
+}
+
+.session-dots .grade-blunder {
+  background: var(--grade-blunder);
+}
+
+.session-dots.large {
+  justify-content: center;
+  gap: 8px;
+}
+
+.session-dots.large li {
+  width: 16px;
+  height: 16px;
+}
+
+.result-xp {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--grade-inaccuracy);
+  animation: pop-in 0.3s ease-out 0.3s both;
+}
+
+.result-streak + .result-xp {
+  margin-left: 0;
+}
+
+.rank-up {
+  padding: 8px 12px;
+  font-weight: 700;
+  color: var(--on-accent);
+  text-align: center;
+  background: var(--grade-inaccuracy);
+  border-radius: var(--radius-sm);
+  animation: stamp 0.45s cubic-bezier(0.3, 1.5, 0.5, 1) 0.2s both;
+}
+
+.session-card {
+  align-items: center;
+  text-align: center;
+}
+
+.session-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.session-grade {
+  font-size: 72px;
+  line-height: 1;
+  color: var(--ink);
+  animation: stamp 0.5s cubic-bezier(0.3, 1.5, 0.5, 1) 0.1s both;
+}
+
+.session-card.score-S {
+  --grade: var(--grade-inaccuracy);
+}
+
+.session-card.score-S .session-grade {
+  color: var(--grade-inaccuracy);
+}
+
+.session-card.score-A {
+  --grade: var(--grade-best);
+}
+
+.session-card.score-A .session-grade {
+  color: var(--grade-best);
+}
+
+.session-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  width: 100%;
+  margin: 0;
+}
+
+.session-stats div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.session-stats dt {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.session-stats dd {
+  margin: 0;
+  font-size: 22px;
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-rank-name,
+  .session-dots li,
+  .result-xp,
+  .rank-up,
+  .session-grade {
+    animation: none;
+  }
+}

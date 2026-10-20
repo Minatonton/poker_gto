@@ -45,4 +45,3 @@ export function dealNextCard(
   if (candidates.length === 0) throw new Error('配れるカードがありません')
   return candidates[Math.floor(random() * candidates.length)]
 }
-

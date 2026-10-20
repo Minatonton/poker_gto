@@ -200,7 +200,9 @@ export function explainPostflop(input: PostflopExplainInput): string[] {
     const mainCategoryAction = bestIndex(input.categoryFrequencies)
     lines.push(
       `レンジ全体では、${made} の手札は ${actions[mainCategoryAction].label} を ${pct(input.categoryFrequencies[mainCategoryAction])} 選んでいます。` +
-        (input.categoryFrequencies[mainCategoryAction] < MAIN_ACTION_FREQUENCY ? '同じ役の中でも、キッカーやブロッカーで選ぶアクションが分かれます。' : ''),
+        (input.categoryFrequencies[mainCategoryAction] < MAIN_ACTION_FREQUENCY
+          ? '同じ役の中でも、キッカーやブロッカーで選ぶアクションが分かれます。'
+          : ''),
     )
   }
   return lines

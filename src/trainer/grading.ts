@@ -72,8 +72,6 @@ export function gradeByEv(
           : 'blunder'
   const byFrequency = gradeByFrequency(frequencies, chosen, rng)
   const usedByGto = byFrequency === 'best' || frequencies[chosen] >= INACCURACY_MIN_FREQUENCY
-  const grade = usedByGto
-    ? GRADE_ORDER[Math.min(GRADE_ORDER.indexOf(byEv), GRADE_ORDER.indexOf(byFrequency))]
-    : byEv
+  const grade = usedByGto ? GRADE_ORDER[Math.min(GRADE_ORDER.indexOf(byEv), GRADE_ORDER.indexOf(byFrequency))] : byEv
   return { grade, evLoss }
 }

@@ -10,12 +10,24 @@ const fold = { kind: 'fold' as const, label: 'Fold' }
 
 describe('explainPreflop', () => {
   it('頻度を並べ、主に選ぶべきアクションを示す', () => {
-    const lines = explainPreflop({ hand: 'K9o', actions: [raise, fold], frequencies: [1, 0], chosen: 1, playersBehind: 2 })
+    const lines = explainPreflop({
+      hand: 'K9o',
+      actions: [raise, fold],
+      frequencies: [1, 0],
+      chosen: 1,
+      playersBehind: 2,
+    })
     expect(lines[0]).toContain('主に選ぶべきは Raise 2.5bb')
   })
 
   it('オープンを降りたときは、後ろの人数が少ないことを理由に挙げる', () => {
-    const lines = explainPreflop({ hand: 'K9o', actions: [raise, fold], frequencies: [1, 0], chosen: 1, playersBehind: 2 })
+    const lines = explainPreflop({
+      hand: 'K9o',
+      actions: [raise, fold],
+      frequencies: [1, 0],
+      chosen: 1,
+      playersBehind: 2,
+    })
     expect(lines.join()).toContain('後ろにいるのは 2 人だけ')
   })
 
@@ -64,7 +76,13 @@ describe('explainPreflop', () => {
   })
 
   it('混ぜているアクションを選んだときは、EV が等しいことを説明する', () => {
-    const lines = explainPreflop({ hand: '55', actions: [raise, fold], frequencies: [0.6, 0.4], chosen: 1, playersBehind: 5 })
+    const lines = explainPreflop({
+      hand: '55',
+      actions: [raise, fold],
+      frequencies: [0.6, 0.4],
+      chosen: 1,
+      playersBehind: 5,
+    })
     expect(lines.join()).toContain('混合戦略')
   })
 })
@@ -91,7 +109,16 @@ describe('explainPostflop', () => {
   })
 
   it('ベットを受けているときは必要勝率と比べる', () => {
-    const lines = explainPostflop({ ...base, actions: [fold, call], frequencies: [1, 0], evs: [0, -0.5], chosen: 1, equity: 0.2, toCall: 2, pot: 7.5 })
+    const lines = explainPostflop({
+      ...base,
+      actions: [fold, call],
+      frequencies: [1, 0],
+      evs: [0, -0.5],
+      chosen: 1,
+      equity: 0.2,
+      toCall: 2,
+      pot: 7.5,
+    })
     expect(lines.join()).toContain('コールに必要な勝率は 21.1%')
   })
 })

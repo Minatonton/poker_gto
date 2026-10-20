@@ -64,7 +64,13 @@ describe('villainAction', () => {
 
 describe('dealNextCard', () => {
   it('手札と重なるカードは配らない', () => {
-    const node = { kind: 'chance' as const, board: [], pot: 0, bets: [0, 0] as [number, number], possibleCards: [cardToId('As'), cardToId('2c')] }
+    const node = {
+      kind: 'chance' as const,
+      board: [],
+      pot: 0,
+      bets: [0, 0] as [number, number],
+      possibleCards: [cardToId('As'), cardToId('2c')],
+    }
     expect(dealNextCard(node, ['As', 'Kd'])).toBe(cardToId('2c'))
   })
 })

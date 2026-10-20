@@ -19,8 +19,7 @@ export interface PreflopQuestion {
   cards: [string, string]
 }
 
-const pick = <T>(items: readonly T[], random: () => number): T | undefined =>
-  items[Math.floor(random() * items.length)]
+const pick = <T>(items: readonly T[], random: () => number): T | undefined => items[Math.floor(random() * items.length)]
 
 /**
  * 出題する手番まで進めるラインを作る。hero を指定すると、その席が手番になるラインだけを選ぶ。

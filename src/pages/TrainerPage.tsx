@@ -20,6 +20,7 @@ import {
   DAILY_GOAL,
   emptyProgress,
   normalizeProgress,
+  rankOf,
   recordAnswer,
   todayCount,
   type Progress,
@@ -37,6 +38,7 @@ import { equityVsRange } from '../poker/equity'
 import { dealerOf, seatOf, seatsFromBottom, tableState } from '../poker/table'
 import { classifyHand } from '../poker/handCategory'
 import { breakdownNode } from '../solver/breakdown'
+import { SESSION_SIZE, summarize, type SessionAnswer } from '../trainer/session'
 
 type Mode = 'preflop' | 'postflop'
 
@@ -70,6 +72,13 @@ interface Props {
   onOpenAnalyze: () => void
 }
 
+/** 直前の1問で得たもの。採点カードに添える */
+interface Gain {
+  xp: number
+  /** ランクが上がったら新しいランクの名前 */
+  rankUp: string | null
+}
+
 /** 出題の種類ごとの画面に共通して渡すもの */
 interface ShellProps {
   useRng: boolean
@@ -78,6 +87,15 @@ interface ShellProps {
   /** 出題タブの先頭に置く、出題の種類と RNG の設定 */
   settings: ReactNode
   statsTab: DockTab
+  hud: ReactNode
+  gain: Gain | null
+  /**
+   * 次の問題へ進む前に通す。10問のチャレンジが終わっていたら、進む代わりにまとめを出し、
+   * まとめを閉じたときに run を呼ぶ
+   */
+  gate: (run: () => void) => void
+  /** チャレンジのまとめ。出しているあいだは卓に重ね、操作は「次の10問へ」だけにする */
+  summary: { card: ReactNode; onClose: () => void } | null
 }
 
 const isGood = (grade: Grade) => grade === 'best' || grade === 'correct'
@@ -87,13 +105,36 @@ export function TrainerPage({ solution, solvedSpot, onOpenAnalyze }: Props) {
   const [mode, setMode] = useState<Mode>('preflop')
   const [useRng, setUseRng] = useState(false)
   const [stats, setStats] = useState(loadStats)
+  const [session, setSession] = useState<SessionAnswer[]>([])
+  const [gain, setGain] = useState<Gain | null>(null)
+  const [pending, setPending] = useState<{ run: () => void } | null>(null)
   const progress = stats[mode]
 
   const record = (grade: Grade) => {
-    const next = { ...stats, [mode]: recordAnswer(stats[mode], grade) }
+    const before = stats[mode]
+    const after = recordAnswer(before, grade)
+    const next = { ...stats, [mode]: after }
     saveStats(next)
     setStats(next)
-    playCue(!isGood(grade) ? 'bad' : next[mode].streak >= STREAK_CUE_FROM ? 'streak' : 'good')
+    const xp = after.xp - before.xp
+    const rank = rankOf(after.xp).name
+    const rankUp = rank !== rankOf(before.xp).name ? rank : null
+    setSession([...session, { grade, xp }])
+    setGain({ xp, rankUp })
+    playCue(!isGood(grade) ? 'bad' : rankUp || after.streak >= STREAK_CUE_FROM ? 'streak' : 'good')
+  }
+  const changeMode = (next: Mode) => {
+    setMode(next)
+    setSession([])
+    setPending(null)
+  }
+  const gate = (run: () => void) => {
+    if (session.length >= SESSION_SIZE) {
+      setPending({ run })
+      playCue('streak')
+    } else {
+      run()
+    }
   }
   const reset = () => {
     const next = { ...stats, [mode]: emptyProgress() }
@@ -114,7 +155,7 @@ export function TrainerPage({ solution, solvedSpot, onOpenAnalyze }: Props) {
             { value: 'postflop', label: 'ポストフロップ' },
           ]}
           value={mode}
-          onChange={setMode}
+          onChange={changeMode}
         />
         <label className="checkbox-row">
           <input type="checkbox" checked={useRng} onChange={(e) => setUseRng(e.target.checked)} />
@@ -124,6 +165,17 @@ export function TrainerPage({ solution, solvedSpot, onOpenAnalyze }: Props) {
       </>
     ),
     statsTab: { id: 'stats', label: '成績', content: <ProgressCard progress={progress} onReset={reset} /> },
+    hud: <TrainerHud progress={progress} session={session} />,
+    gain,
+    gate,
+    summary: pending && {
+      card: <SessionCard answers={session} progress={progress} />,
+      onClose: () => {
+        setSession([])
+        setPending(null)
+        pending.run()
+      },
+    },
   }
 
   if (mode === 'preflop') return <PreflopTrainer solution={solution} {...shell} />
@@ -131,7 +183,7 @@ export function TrainerPage({ solution, solvedSpot, onOpenAnalyze }: Props) {
   return (
     <GameScreen
       coach={<strong>ポストフロップの出題には、先に「分析」でフロップを計算してください。</strong>}
-      hud={<TrainerHud progress={progress} />}
+      hud={shell.hud}
       table={<div className="stage-empty">計算したスポットで、GTO を相手に1ハンドずつ打てます。</div>}
       controls={
         <div className="finished-actions">
@@ -157,13 +209,30 @@ function settingsTab(children: ReactNode): DockTab {
   }
 }
 
-/** 卓の右上に置く、連続正解と今日の問題数。数字が変わった瞬間だけ跳ねさせる */
-function TrainerHud({ progress }: { progress: Progress }) {
+/** 卓の右上に置く、ランク・チャレンジの進み具合・連続正解・今日の問題数。数字が変わった瞬間だけ跳ねさせる */
+function TrainerHud({ progress, session }: { progress: Progress; session: SessionAnswer[] }) {
   const today = todayCount(progress)
+  const rank = rankOf(progress.xp)
   return (
     <div className="trainer-hud">
+      <div
+        className="hud-rank"
+        title={rank.next ? `${rank.next.name} まであと ${rank.next.remaining} XP` : '最上位のランクです'}
+      >
+        <span className="hud-rank-name" key={rank.name}>
+          {rank.name}
+        </span>
+        <span className="hud-rank-track">
+          <span style={{ width: `${rank.progress * 100}%` }} />
+        </span>
+      </div>
+      <ol className="session-dots" aria-label={`チャレンジ ${session.length} / ${SESSION_SIZE} 問`}>
+        {Array.from({ length: SESSION_SIZE }, (_, i) => (
+          <li key={i} className={session[i] ? `grade-${session[i].grade}` : ''} />
+        ))}
+      </ol>
       <div className="hud-streak" title={`最高 ${progress.bestStreak}`}>
-        <span className="hud-label">連続正解</span>
+        <span className="hud-label">連続</span>
         <strong key={progress.streak} className={`num ${progress.streak > 0 ? 'bump' : ''}`}>
           {progress.streak}
         </strong>
@@ -180,6 +249,45 @@ function TrainerHud({ progress }: { progress: Progress }) {
   )
 }
 
+/** 10問のチャレンジのまとめ。ゲームのラウンドの結果画面のように、評価を大きく見せてから内訳を出す */
+function SessionCard({ answers, progress }: { answers: SessionAnswer[]; progress: Progress }) {
+  const summary = summarize(answers)
+  const rank = rankOf(progress.xp)
+  return (
+    <div className={`result-card session-card score-${summary.score}`} role="status">
+      <div className="session-score">
+        <span className="muted small">チャレンジ結果</span>
+        <strong className="session-grade">{summary.score}</strong>
+      </div>
+      <ol className="session-dots large">
+        {answers.map((answer, i) => (
+          <li key={i} className={`grade-${answer.grade}`} />
+        ))}
+      </ol>
+      <dl className="session-stats">
+        <div>
+          <dt>正解</dt>
+          <dd className="num">
+            {summary.good} / {summary.answered}
+          </dd>
+        </div>
+        <div>
+          <dt>最長の連続正解</dt>
+          <dd className="num">{summary.bestStreak}</dd>
+        </div>
+        <div>
+          <dt>獲得 XP</dt>
+          <dd className="num">+{summary.xp}</dd>
+        </div>
+      </dl>
+      <p className="muted small">
+        いまのランクは {rank.name}
+        {rank.next ? `。${rank.next.name} まであと ${rank.next.remaining} XP` : '。最上位です'}
+      </p>
+    </div>
+  )
+}
+
 const rollRng = () => Math.random()
 
 type PreflopAnswer = { chosen: number; grade: Grade; explanation: string[] }
@@ -191,6 +299,10 @@ function PreflopTrainer({
   onGrade,
   settings,
   statsTab,
+  hud,
+  gain,
+  gate,
+  summary,
 }: ShellProps & { solution: PreflopSolution }) {
   const [kind, setKind] = useState<PreflopDrillKind>('rfi')
   const [seat, setSeat] = useState<Position | 'random'>('random')
@@ -243,7 +355,7 @@ function PreflopTrainer({
           </>
         ) : null
       }
-      hud={<TrainerHud progress={progress} />}
+      hud={hud}
       table={
         table ? (
           <PokerTable
@@ -251,17 +363,19 @@ function PreflopTrainer({
             seats={table.seats}
             pot={table.pot}
             overlay={
-              answer && (
+              summary?.card ??
+              (answer && (
                 <ResultCard
                   grade={answer.grade}
                   streak={progress.streak}
+                  gain={gain}
                   actions={question.walk.strategy.actions}
                   frequencies={frequencies}
                   chosen={answer.chosen}
                   rngAction={useRng ? actionForRng(frequencies, rng) : undefined}
                   explanation={answer.explanation}
                 />
-              )
+              ))
             }
           />
         ) : (
@@ -269,10 +383,12 @@ function PreflopTrainer({
         )
       }
       controls={
-        question && !answer ? (
+        summary ? (
+          <NextBar label="次の10問へ" onNext={summary.onClose} />
+        ) : question && !answer ? (
           <ActionBar actions={question.walk.strategy.actions} onChoose={choose} />
         ) : (
-          <NextBar label="次の問題" onNext={() => next()} />
+          <NextBar label="次の問題" onNext={() => gate(() => next())} />
         )
       }
       tabs={[
@@ -387,6 +503,7 @@ function NextBar({ label, onNext, disabled = false }: { label: string; onNext: (
 function ResultCard({
   grade,
   streak,
+  gain,
   actions,
   frequencies,
   evs,
@@ -397,6 +514,7 @@ function ResultCard({
 }: {
   grade: Grade
   streak: number
+  gain: Gain | null
   actions: Action[]
   frequencies: number[]
   evs?: number[]
@@ -412,7 +530,9 @@ function ResultCard({
         <strong className="result-grade">{info.label}</strong>
         <span className="result-description">{info.description}</span>
         {isGood(grade) && streak >= 2 && <span className="result-streak num">{streak} 連続</span>}
+        {gain && <span className="result-xp num">+{gain.xp} XP</span>}
       </div>
+      {gain?.rankUp && <p className="rank-up">ランクアップ！ {gain.rankUp} になりました</p>}
       {evLoss !== undefined && evLoss > 0 && <p className="result-loss num">EV の損失 {evLoss.toFixed(2)}bb</p>}
       <ul className="advice-bars result-bars">
         {actions.map((action, index) => (
@@ -507,7 +627,18 @@ interface HandState {
 
 type PostflopAnswer = { chosen: number; grade: Grade; evLoss: number; explanation: string[] }
 
-function PostflopTrainer({ spot, useRng, progress, onGrade, settings, statsTab }: ShellProps & { spot: PostflopSpot }) {
+function PostflopTrainer({
+  spot,
+  useRng,
+  progress,
+  onGrade,
+  settings,
+  statsTab,
+  hud,
+  gain,
+  gate,
+  summary,
+}: ShellProps & { spot: PostflopSpot }) {
   const clientRef = useRef(new SolverClient())
   const [sideChoice, setSideChoice] = useState<'oop' | 'ip' | 'random'>('random')
   const [hand, setHand] = useState<HandState | null>(null)
@@ -635,17 +766,19 @@ function PostflopTrainer({ spot, useRng, progress, onGrade, settings, statsTab }
   return (
     <GameScreen
       coach={coach}
-      hud={<TrainerHud progress={progress} />}
+      hud={hud}
       table={
         <PokerTable
           seats={hand ? postflopSeats(spot, hand) : idleSeats(spot)}
           pot={hand ? toBb(hand.node.pot) : spot.potBb}
           board={hand ? displayBoard(hand.node.board) : []}
           overlay={
-            answer && heroCombo ? (
+            summary?.card ??
+            (answer && heroCombo ? (
               <ResultCard
                 grade={answer.grade}
                 streak={progress.streak}
+                gain={gain}
                 actions={actions}
                 frequencies={heroCombo.strategy}
                 evs={evAvailable ? evs : undefined}
@@ -656,19 +789,21 @@ function PostflopTrainer({ spot, useRng, progress, onGrade, settings, statsTab }
               />
             ) : (
               hand && !heroNode && <HandEnd hand={hand} spot={spot} />
-            )
+            ))
           }
         />
       }
       controls={
-        !hand ? (
+        summary ? (
+          <NextBar label="次の10問へ" onNext={summary.onClose} />
+        ) : !hand ? (
           <NextBar label="ハンドを配る" onNext={start} disabled={busy} />
         ) : heroNode && !answer ? (
           <ActionBar actions={actions} onChoose={choose} disabled={busy} />
         ) : answer ? (
-          <NextBar label="続ける" onNext={proceed} disabled={busy} />
+          <NextBar label="続ける" onNext={() => gate(proceed)} disabled={busy} />
         ) : (
-          <NextBar label="次のハンドを配る" onNext={start} disabled={busy} />
+          <NextBar label="次のハンドを配る" onNext={() => gate(start)} disabled={busy} />
         )
       }
       tabs={[

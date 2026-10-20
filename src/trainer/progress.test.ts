@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { accuracy, emptyProgress, normalizeProgress, recordAnswer, todayCount } from './progress'
+import { accuracy, emptyProgress, normalizeProgress, rankOf, recordAnswer, todayCount, xpFor } from './progress'
 
 const day1 = new Date(2026, 9, 20, 10)
 const day2 = new Date(2026, 9, 21, 10)
@@ -41,5 +41,33 @@ describe('normalizeProgress', () => {
     const progress = normalizeProgress({ best: 3, correct: 1, inaccuracy: 0, wrong: 2, blunder: 0 })
     expect(progress.grades.best).toBe(3)
     expect(progress.streak).toBe(0)
+  })
+})
+
+describe('経験値とランク', () => {
+  it('外しても経験値は減らず、Best は連続正解の分だけ上乗せされる', () => {
+    expect(xpFor('wrong', 0)).toBeGreaterThan(0)
+    expect(xpFor('best', 5)).toBeGreaterThan(xpFor('best', 1))
+    expect(xpFor('blunder', 0)).toBe(0)
+  })
+
+  it('連続正解の上乗せには上限がある', () => {
+    expect(xpFor('best', 50)).toBe(xpFor('best', 10))
+  })
+
+  it('答えるたびに経験値が貯まる', () => {
+    const progress = recordAnswer(recordAnswer(emptyProgress(), 'best', day1), 'best', day1)
+    expect(progress.xp).toBe(xpFor('best', 1) + xpFor('best', 2))
+  })
+
+  it('ランクは経験値で決まり、次のランクまでの残りが分かる', () => {
+    expect(rankOf(0)).toMatchObject({ name: 'ブロンズ', progress: 0, next: { name: 'シルバー', remaining: 200 } })
+    expect(rankOf(400).name).toBe('シルバー')
+    expect(rankOf(400).progress).toBeCloseTo(0.5)
+    expect(rankOf(99999)).toMatchObject({ name: 'マスター', progress: 1, next: null })
+  })
+
+  it('経験値を持たない以前の記録は 0 から始める', () => {
+    expect(normalizeProgress({ grades: emptyProgress().grades, streak: 0, bestStreak: 0 }).xp).toBe(0)
   })
 })

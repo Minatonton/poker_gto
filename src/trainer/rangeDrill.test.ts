@@ -41,7 +41,12 @@ describe('matchScore', () => {
   })
 
   it('到達しないハンドは採点に含めない', () => {
-    const reached = { ...buildStrategy([{ action: raise, range: 'AA' }, { action: call, range: 'KK' }]) }
+    const reached = {
+      ...buildStrategy([
+        { action: raise, range: 'AA' },
+        { action: call, range: 'KK' },
+      ]),
+    }
     reached.weights = new Map([...reached.frequencies.keys()].map((h) => [h, h === 'AA' || h === 'KK' ? 1 : 0]))
     const user = emptyPainting(reached)
     user.set('AA', [1, 0, 0])
