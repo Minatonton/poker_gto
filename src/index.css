@@ -1,44 +1,50 @@
 /*
- * 白い面と淡いグレーの作業領域、藍のアクセントで構成する。領域の区切りは影でなく 1px 罫線。
- * アクションの色（赤=ベット/レイズ、緑=チェック/コール、青=フォールド）はポーカーのツールで
- * 共通の慣習なので、ブランド色とは別に固定している。
+ * ソルバーの結果を長時間眺める画面なので、目が疲れにくい黒基調にしている。
+ * 面は無彩色の濃淡だけで分け、選択中の状態も色ではなく明るさで示す。
+ * 色を持つのはアクション（赤=ベット/レイズ、緑=チェック/コール、青=フォールド）とスートだけにして、
+ * グリッドの色が画面の中で一番目立つようにしている。
  */
 :root {
-  --ink: #14161b;
-  --body: #34383f;
-  --sub: #4d525d;
-  --label: #656c77;
-  --muted: #808896;
-  --faint: #b0b6c0;
+  --ink: #e9ebef;
+  --body: #d3d6dc;
+  --sub: #aeb3bc;
+  --label: #8d939e;
+  --muted: #737985;
+  --faint: #4a4f59;
 
-  --brand: #2d48c4;
-  --brand-dark: #22399b;
-  --brand-tint: #eceffb;
+  /* 選択中・主ボタンの明るい面。--on-accent はその上の文字 */
+  --accent: #eceef1;
+  --accent-hover: #ffffff;
+  --on-accent: #111214;
+  --selected: #272a31;
 
-  --line: #e0e2e9;
-  --mist: #e9ebf1;
-  --input-line: #d3d7df;
-  --bg-subtle: #f8f9fc;
-  --bg-app: #f0f2f6;
-  --row-selected: #f1f5fd;
+  --surface: #18191c;
+  --hover: #22252a;
+  --line: #2a2d34;
+  --line-strong: #3a3f48;
+  --mist: #24272d;
+  --input-line: #353942;
+  --bg-subtle: #1e2025;
+  --bg-app: #0f1012;
+  --row-selected: #262a31;
 
-  --action-raise: #e0565b;
-  --action-call: #3fae6a;
-  --action-fold: #5a8bd6;
-  --cell-empty: #f1f2f6;
-  --cell-dimmed: #dfe2e8;
+  --action-raise: #e5534b;
+  --action-call: #46b06e;
+  --action-fold: #4a7fd1;
+  --cell-empty: #1f2126;
+  --cell-dimmed: #2b2e35;
 
   --suit-c: #2f9e5b;
   --suit-d: #2f6fd0;
   --suit-h: #d6403f;
-  --suit-s: #3a3f4a;
+  --suit-s: #5a5f6b;
 
-  --error: #c4352b;
+  --error: #ff6b5e;
   --radius-sm: 6px;
   --radius-md: 10px;
   --mono: 'IBM Plex Mono', ui-monospace, monospace;
 
-  color-scheme: light;
+  color-scheme: dark;
   font-family: 'Noto Sans JP', system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', sans-serif;
   font-size: 14px;
   line-height: 1.6;
@@ -75,7 +81,7 @@ button:disabled {
 }
 
 :focus-visible {
-  outline: 2px solid var(--brand);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -113,24 +119,21 @@ p {
   gap: 16px;
   height: 60px;
   padding: 0 22px;
-  background: #fff;
+  background: var(--surface);
   border-bottom: 1px solid var(--line);
 }
 
 .brand {
-  font-size: 20px;
+  font-size: 17px;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--brand);
+  letter-spacing: 0.02em;
+  color: var(--ink);
 }
 
 .game-chip {
   margin-left: auto;
-  padding: 2px 10px;
   font-size: 12px;
-  color: var(--brand);
-  background: var(--brand-tint);
-  border-radius: 999px;
+  color: var(--label);
 }
 
 .app-body {
@@ -144,7 +147,7 @@ p {
   flex-direction: column;
   gap: 2px;
   padding: 16px 12px;
-  background: #fff;
+  background: var(--surface);
   border-right: 1px solid var(--line);
 }
 
@@ -168,8 +171,8 @@ p {
 
 .nav-item[aria-current='page'] {
   font-weight: 500;
-  color: var(--brand);
-  background: var(--brand-tint);
+  color: var(--accent);
+  background: var(--selected);
 }
 
 .nav-item svg {
@@ -222,10 +225,9 @@ p {
 
 .card {
   min-width: 0;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  box-shadow: 0 1px 2px rgb(20 20 40 / 0.04);
 }
 
 .card-header {
@@ -258,31 +260,31 @@ p {
   padding: 0 14px;
   font-size: 12px;
   color: var(--body);
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--input-line);
   border-radius: var(--radius-sm);
 }
 
 .btn:hover:not(:disabled) {
-  background: #f2f4f7;
+  background: var(--hover);
 }
 
 .btn.primary {
   padding: 0 18px;
   font-weight: 500;
-  color: #fff;
-  background: var(--brand);
+  color: var(--on-accent);
+  background: var(--accent);
   border: none;
 }
 
 .btn.primary:hover:not(:disabled) {
-  background: var(--brand-dark);
+  background: var(--accent-hover);
 }
 
 .btn:disabled {
-  color: #fff;
-  background: var(--faint);
-  border-color: var(--faint);
+  color: var(--muted);
+  background: var(--mist);
+  border-color: var(--mist);
 }
 
 .btn.large {
@@ -306,13 +308,13 @@ input {
   height: 34px;
   padding: 0 10px;
   font-size: 13px;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--input-line);
   border-radius: var(--radius-sm);
 }
 
 input:focus {
-  border-color: var(--brand);
+  border-color: var(--accent);
   outline: none;
 }
 
@@ -368,14 +370,14 @@ input:focus {
   align-items: center;
   gap: 10px;
   padding: 6px 10px;
-  background: var(--brand-tint);
-  border: 1px solid #cbd3f2;
+  background: var(--selected);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
 }
 
 .decision-actor {
   font-weight: 700;
-  color: var(--brand);
+  color: var(--accent);
 }
 
 .decision-choices {
@@ -394,7 +396,7 @@ input:focus {
   padding: 6px 10px 9px;
   overflow: hidden;
   text-align: left;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--input-line);
   border-radius: var(--radius-sm);
 }
@@ -771,7 +773,7 @@ button.action-row:hover {
 .progress-track span {
   display: block;
   height: 100%;
-  background: var(--brand);
+  background: var(--accent);
   transition: width 0.4s ease;
 }
 
@@ -874,7 +876,7 @@ button.action-row:hover {
   white-space: nowrap;
   font-size: 12px;
   color: var(--body);
-  background: #fff;
+  background: var(--surface);
   border: none;
 }
 
@@ -883,13 +885,13 @@ button.action-row:hover {
 }
 
 .segmented button:hover {
-  background: #f2f4f7;
+  background: var(--hover);
 }
 
 .segmented button[aria-checked='true'] {
   font-weight: 500;
-  color: #fff;
-  background: var(--brand);
+  color: var(--on-accent);
+  background: var(--accent);
 }
 
 .btn.small-btn {
@@ -919,12 +921,12 @@ button.action-row:hover {
 }
 
 .hero-card {
-  border-color: #cbd3f2;
+  border-color: var(--line-strong);
 }
 
 .hero-card .card-header {
-  color: var(--brand);
-  background: var(--brand-tint);
+  color: var(--accent);
+  background: var(--selected);
   border-radius: var(--radius-md) var(--radius-md) 0 0;
 }
 
@@ -935,7 +937,7 @@ button.action-row:hover {
 }
 
 .range-cell.hero {
-  outline: 3px solid var(--brand);
+  outline: 3px solid var(--accent);
   outline-offset: -2px;
   z-index: 2;
 }
@@ -946,7 +948,7 @@ button.action-row:hover {
   right: 3px;
   width: 7px;
   height: 7px;
-  background: #fff;
-  border: 2px solid var(--brand);
+  background: var(--surface);
+  border: 2px solid var(--accent);
   border-radius: 999px;
 }
