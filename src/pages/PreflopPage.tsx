@@ -25,6 +25,8 @@ interface Props {
   hero: Hero
   onHeroInput: (input: HeroInput) => void
   onSolveSpot: (spot: PostflopSpot) => void
+  /** いまの卓の状態をハンドレビューに記録する */
+  onRecord: () => void
 }
 
 export function PreflopPage({
@@ -38,6 +40,7 @@ export function PreflopPage({
   hero,
   onHeroInput,
   onSolveSpot,
+  onRecord,
 }: Props) {
   const [showFrequencies, setShowFrequencies] = useState(true)
   const [pickingCards, setPickingCards] = useState(false)
@@ -146,9 +149,14 @@ export function PreflopPage({
           <HandHistory
             entries={history}
             footer={
-              <button className="btn small-btn" onClick={() => onNavigate([])} disabled={choices.length === 0}>
-                最初からやり直す
-              </button>
+              <div className="finished-actions">
+                <button className="btn small-btn" onClick={onRecord}>
+                  このハンドを記録する
+                </button>
+                <button className="btn small-btn" onClick={() => onNavigate([])} disabled={choices.length === 0}>
+                  最初からやり直す
+                </button>
+              </div>
             }
           />
 

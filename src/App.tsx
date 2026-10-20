@@ -5,6 +5,9 @@ import { cashSolution, MAX_PLAYERS, MIN_PLAYERS } from './data/cashSolutions'
 import { CalculatorsPage } from './pages/CalculatorsPage'
 import { PreflopPage } from './pages/PreflopPage'
 import { RangeDrillPage } from './pages/RangeDrillPage'
+import { ReviewPage } from './pages/ReviewPage'
+import { loadReviews, newReview, saveReviews, type HandReview } from './review/reviews'
+import { formatPercent } from './components/actionColors'
 import { TrainerPage } from './pages/TrainerPage'
 import { parseHero, type HeroInput } from './poker/hero'
 import type { PostflopSpot } from './poker/postflopSpot'
@@ -25,6 +28,8 @@ export default function App() {
   // 選択欄で選んだ内容を別に持つ。アクションラインで直接進めたら、辿ったラインの表示に戻す
   const [pickedLine, setPickedLine] = useState<PreflopLine | null>(null)
   const [solvedSpot, setSolvedSpot] = useState<PostflopSpot | null>(null)
+  const [reviews, setReviews] = useState(loadReviews)
+  const [selectedReview, setSelectedReview] = useState<string | null>(null)
 
   const walk = useMemo(() => walkPreflop(solution, choices), [solution, choices])
   const line = useMemo(() => pickedLine ?? lineOfWalk(walk), [pickedLine, walk])
@@ -44,6 +49,42 @@ export default function App() {
   const navigate = (next: ActionKind[]) => {
     setPickedLine(null)
     setChoices(next)
+  }
+
+  const changeReviews = (next: HandReview[]) => {
+    setReviews(next)
+    saveReviews(next)
+  }
+
+  /** いまの卓の状態を記録として残す。手番が自分なら、そのときの GTO の頻度も書き込む */
+  const recordHand = () => {
+    const heroFrequencies =
+      walk.status === 'deciding' && hero.handClass && walk.position === hero.position
+        ? walk.strategy.frequencies.get(hero.handClass)
+        : undefined
+    const gtoSummary =
+      walk.status === 'deciding' && heroFrequencies
+        ? `${hero.handClass}: ` +
+          walk.strategy.actions.map((a, i) => `${a.label} ${formatPercent(heroFrequencies[i])}`).join(' / ')
+        : ''
+    const review = newReview({
+      players,
+      choices,
+      heroPosition: hero.position,
+      heroCards: hero.cards?.join('') ?? '',
+      gtoSummary,
+    })
+    changeReviews([review, ...reviews])
+    setSelectedReview(review.id)
+    setPage('review')
+  }
+
+  const openReview = (review: HandReview) => {
+    setPlayers(review.players)
+    setPickedLine(null)
+    setChoices(review.choices)
+    setHeroInput({ position: review.heroPosition, cardsText: review.heroCards })
+    setPage('preflop')
   }
 
   const solveSpot = (spot: PostflopSpot) => {
@@ -98,6 +139,7 @@ export default function App() {
             hero={hero}
             onHeroInput={setHeroInput}
             onSolveSpot={solveSpot}
+            onRecord={recordHand}
           />
         </main>
 
@@ -130,6 +172,16 @@ export default function App() {
 
         <main className="page" hidden={page !== 'drill'}>
           <RangeDrillPage key={players} solution={solution} />
+        </main>
+
+        <main className="page" hidden={page !== 'review'}>
+          <ReviewPage
+            reviews={reviews}
+            selectedId={selectedReview}
+            onSelect={setSelectedReview}
+            onChange={changeReviews}
+            onOpen={openReview}
+          />
         </main>
 
         <main className="page" hidden={page !== 'calculators'}>

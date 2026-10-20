@@ -1874,3 +1874,84 @@ textarea {
 .players-select select {
   height: 30px;
 }
+
+/* ---------- ハンドレビュー ---------- */
+
+.review-layout {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 1000px) {
+  .review-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.review-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.review-items {
+  max-height: 60vh;
+  margin: 0;
+  padding: 0 8px 8px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.review-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 10px;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+}
+
+.review-item:hover {
+  background: var(--hover);
+}
+
+.review-item.selected {
+  background: var(--selected);
+  border-color: var(--line-strong);
+}
+
+.review-item-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.review-item-lesson {
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--sub);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.review-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.review-form textarea,
+.review-form select {
+  width: 100%;
+}
+
+.btn.danger {
+  color: #fff;
+  background: var(--action-raise);
+  border-color: var(--action-raise);
+}
