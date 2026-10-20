@@ -34,7 +34,15 @@ import {
   type PreflopDrillKind,
   type PreflopQuestion,
 } from '../trainer/preflopDrill'
-import { explainPostflop, explainPreflop, explainPreflopSize } from '../trainer/explain'
+import {
+  explainPostflop,
+  explainPreflop,
+  explainPreflopSize,
+  inThinkingOrder,
+  REASON_STEPS,
+  type Reason,
+} from '../trainer/explain'
+import { GlossaryText } from '../learn/GlossaryText'
 import { equityVsRange } from '../poker/equity'
 import { dealerOf, seatOf, seatsFromBottom, tableState } from '../poker/table'
 import { classifyHand } from '../poker/handCategory'
@@ -326,7 +334,7 @@ function reviewQuestion(solution: PreflopSolution, mistakes: Mistake[]): Preflop
 }
 
 /** レイズの額が GTO と違うときの説明。相手は、オープンなら BB、レイズを受けているならレイズした人 */
-function sizeExplanation(question: PreflopQuestion, chosenAmount: number, gtoAmount: number): string[] {
+function sizeExplanation(question: PreflopQuestion, chosenAmount: number, gtoAmount: number): Reason[] {
   const { steps, positions, position } = question.walk
   const state = tableState(steps, positions)
   const raiser = steps.findLast((s) => s.action.kind === 'raise' && s.position !== position)?.position
@@ -347,7 +355,7 @@ function raiseSizesOf(question: PreflopQuestion): number[] | undefined {
   return preflopSizeChoices(raise.amount, tableState(question.walk.steps, question.walk.positions).currentBet)
 }
 
-type PreflopAnswer = { chosen: number; grade: Grade; explanation: string[]; amount?: number; sizeMiss?: boolean }
+type PreflopAnswer = { chosen: number; grade: Grade; explanation: Reason[]; amount?: number; sizeMiss?: boolean }
 
 function PreflopTrainer({
   solution,
@@ -414,11 +422,7 @@ function PreflopTrainer({
       grade,
       amount,
       sizeMiss: sizeMatters,
-      // 額だけが違うときは、頻度の行（「選んだ Raise 2.5bb が最も多く選ばれます」）を外す。
-      // 別の額を選んだ人には、選んだものが正解だと言っているように読めてしまうため
-      explanation: sizeMatters
-        ? [...sizeLine, ...preflopExplanation(question, frequencies, index).slice(1)]
-        : preflopExplanation(question, frequencies, index),
+      explanation: withSizeReasons(preflopExplanation(question, frequencies, index, sizeMatters, amount), sizeLine),
     })
     setTab('range')
     onGrade(grade)
@@ -542,13 +546,31 @@ function PreflopTrainer({
  * プリフロップの説明に必要な数字を集める。相手は最後にレイズした人で、
  * その人がここまでに選んだアクションの頻度をレンジの重みにして EQ を求める
  */
-function preflopExplanation(question: PreflopQuestion, frequencies: number[], chosen: number): string[] {
+function preflopExplanation(
+  question: PreflopQuestion,
+  frequencies: number[],
+  chosen: number,
+  omitFrequency: boolean,
+  chosenAmount?: number,
+): Reason[] {
   const { walk, hand, cards } = question
+  const actions = walk.strategy.actions
+  const chosenLabel =
+    chosenAmount === undefined ? undefined : `${actions[chosen].label.split(' ')[0]} ${chosenAmount}bb`
   const hero = walk.position
   const lastRaise = walk.steps.findLast((s) => s.action.kind === 'raise' && s.position !== hero)
   const playersBehind = walk.positions.length - 1 - walk.positions.indexOf(hero)
   if (!lastRaise) {
-    return explainPreflop({ hand, actions: walk.strategy.actions, frequencies, chosen, playersBehind })
+    return explainPreflop({
+      hand,
+      actions,
+      frequencies,
+      chosen,
+      playersBehind,
+      position: hero,
+      omitFrequency,
+      chosenLabel,
+    })
   }
   const state = tableState(walk.steps, walk.positions)
   const toCall = state.currentBet - seatOf(state, hero).invested
@@ -561,7 +583,7 @@ function preflopExplanation(question: PreflopQuestion, frequencies: number[], ch
   }
   return explainPreflop({
     hand,
-    actions: walk.strategy.actions,
+    actions,
     frequencies,
     chosen,
     equity,
@@ -569,7 +591,19 @@ function preflopExplanation(question: PreflopQuestion, frequencies: number[], ch
     potBeforeCall: state.pot,
     aggressor: lastRaise.position,
     playersBehind,
+    position: hero,
+    omitFrequency,
+    chosenLabel,
   })
+}
+
+/**
+ * 額の説明を差し込む。場面は「誰のレイズを受けているか」を先に、結論は額の理由を先に置く。
+ * 額だけを間違えた人が一番知りたいのは額の理由で、覚えるための一言は最後に残したいため
+ */
+function withSizeReasons(reasons: Reason[], sizeReasons: Reason[]): Reason[] {
+  const isVerdict = (r: Reason) => r.step === 'verdict' || r.step === 'memory'
+  return inThinkingOrder([...reasons.filter((r) => !isVerdict(r)), ...sizeReasons, ...reasons.filter(isVerdict)])
 }
 
 /** 次へ進むボタン。答えたあとは Enter かスペースでも進めるようにして、手をキーボードから離さずに続けられるようにする */
@@ -628,9 +662,12 @@ function ResultCard({
   evLoss?: number
   chosen: number
   rngAction?: number
-  explanation: string[]
+  explanation: Reason[]
 }) {
   const info = GRADES.find((g) => g.grade === grade)!
+  // 覚えるための一言は、解説を読み切らなくても目に入るよう、頻度のすぐ下に出す
+  const remember = explanation.find((r) => r.step === 'memory')
+  const reasons = explanation.filter((r) => r.step !== 'memory')
   return (
     <div className={`result-card grade-${grade}`} role="status">
       <div className="result-head">
@@ -661,14 +698,29 @@ function ResultCard({
           </li>
         ))}
       </ul>
-      {explanation.length > 0 && (
+      {remember && (
+        <p className="result-memory">
+          <span className="why-step">覚え方</span>
+          {remember.text}
+        </p>
+      )}
+      {reasons.length > 0 && (
         <div className="result-why">
           <strong>{sizeMiss ? 'なぜこの額なのか' : isGood(grade) ? '解説' : 'なぜ別のアクションを選ぶべきか'}</strong>
-          <ul>
-            {explanation.map((line, i) => (
-              <li key={i}>{line}</li>
+          <ol className="why-steps">
+            {reasons.map((reason, i) => (
+              <li key={i} className={`why-${reason.step}`}>
+                {reasons[i - 1]?.step !== reason.step ? (
+                  <span className="why-step">{REASON_STEPS.find((s) => s.step === reason.step)!.label}</span>
+                ) : (
+                  <span />
+                )}
+                <span>
+                  <GlossaryText text={reason.text} />
+                </span>
+              </li>
             ))}
-          </ul>
+          </ol>
         </div>
       )}
     </div>
@@ -736,7 +788,7 @@ interface HandState {
   log: string[]
 }
 
-type PostflopAnswer = { chosen: number; grade: Grade; evLoss: number; explanation: string[] }
+type PostflopAnswer = { chosen: number; grade: Grade; evLoss: number; explanation: Reason[] }
 
 function PostflopTrainer({
   spot,
