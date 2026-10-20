@@ -3,7 +3,14 @@ import { rangeOfPosition, type Position, type Step, type Walk } from './preflop'
 
 const STARTING_STACK_BB = 100
 const BLINDS: Partial<Record<Position, number>> = { SB: 0.5, BB: 1 }
-const POSTFLOP_ORDER: readonly Position[] = ['SB', 'BB', 'UTG', 'HJ', 'CO', 'BTN']
+/**
+ * ポストフロップで行動する順。ブラインドが先で、残りはプリフロップと同じ順。
+ * ヘッズアップでは SB がボタンを兼ねるため、BB が先に行動する
+ */
+function postflopOrder(positions: readonly Position[]): readonly Position[] {
+  if (positions.length === 2) return ['BB', 'SB']
+  return ['SB', 'BB', ...positions.filter((p) => p !== 'SB' && p !== 'BB')]
+}
 
 export interface PostflopSpot {
   /** "BTN vs BB（シングルレイズドポット）" のような説明 */
@@ -14,12 +21,15 @@ export interface PostflopSpot {
   ipRange: Map<HandClass, number>
   potBb: number
   effectiveStackBb: number
+  /** 卓の席。テーブルの表示に使う */
+  positions: readonly Position[]
 }
 
 /** 2人でフロップに進んだプリフロップラインから、フロップ開始時のスポットを作る。3人以上はソルバーが扱えない */
 export function spotFromWalk(walk: Walk): PostflopSpot | null {
   if (walk.status !== 'finished' || walk.flopPlayers.length !== 2) return null
-  const [oop, ip] = [...walk.flopPlayers].sort((a, b) => POSTFLOP_ORDER.indexOf(a) - POSTFLOP_ORDER.indexOf(b))
+  const order = postflopOrder(walk.positions)
+  const [oop, ip] = [...walk.flopPlayers].sort((a, b) => order.indexOf(a) - order.indexOf(b))
 
   const invested = investments(walk.steps)
   const potBb = Object.values(invested).reduce((sum, bb) => sum + bb, 0)
@@ -33,6 +43,7 @@ export function spotFromWalk(walk: Walk): PostflopSpot | null {
     ipRange: rangeOfPosition(walk.steps, ip),
     potBb,
     effectiveStackBb: STARTING_STACK_BB - (invested[oop] ?? 0),
+    positions: walk.positions,
   }
 }
 

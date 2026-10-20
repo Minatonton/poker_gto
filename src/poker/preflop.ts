@@ -1,9 +1,13 @@
 import { ALL_HANDS, type HandClass } from './hands'
 import { buildStrategy, type Action, type Strategy } from './strategy'
 
-export const POSITIONS = ['UTG', 'HJ', 'CO', 'BTN', 'SB', 'BB'] as const
+/** 9人卓までのすべての席の名前。早く行動する順 */
+export const ALL_POSITIONS = ['UTG', 'UTG+1', 'UTG+2', 'LJ', 'HJ', 'CO', 'BTN', 'SB', 'BB'] as const
 
-export type Position = (typeof POSITIONS)[number]
+export type Position = (typeof ALL_POSITIONS)[number]
+
+/** 6人卓の席。ここで持っているレンジの基準になる */
+export const POSITIONS: readonly Position[] = ['UTG', 'HJ', 'CO', 'BTN', 'SB', 'BB']
 
 export interface SpotSpec {
   raiseTo: number
@@ -15,6 +19,8 @@ type ByPosition<T> = Partial<Record<Position, T>>
 
 export interface PreflopSolution {
   name: string
+  /** この卓の席。プリフロップで行動する順 */
+  positions: readonly Position[]
   rfi: ByPosition<SpotSpec>
   /** [オープンした人][応答する人] */
   vsOpen: ByPosition<ByPosition<SpotSpec>>
@@ -34,9 +40,10 @@ export interface Step {
 }
 
 export type Walk =
-  | { steps: Step[]; status: 'deciding'; position: Position; strategy: Strategy }
+  | { steps: Step[]; positions: readonly Position[]; status: 'deciding'; position: Position; strategy: Strategy }
   | {
       steps: Step[]
+      positions: readonly Position[]
       status: 'finished'
       result: string
       /** フロップに進んだプレイヤー。ポットを誰かが獲得して終わったときは空 */
@@ -92,14 +99,17 @@ export function walkPreflop(solution: PreflopSolution, choices: readonly Action[
   }
 
   // 2回目以降の判断では、そこまでに降りたハンドを除いた割合で戦略を見せる
+  const positions = solution.positions
   const deciding = (position: Position, strategy: Strategy): Walk => ({
     steps,
+    positions,
     status: 'deciding',
     position,
     strategy: { ...strategy, weights: rangeOfPosition(steps, position) },
   })
   const finished = (result: string, flopPlayers: Position[] = []): Walk => ({
     steps,
+    positions,
     status: 'finished',
     result,
     flopPlayers,
@@ -112,8 +122,8 @@ export function walkPreflop(solution: PreflopSolution, choices: readonly Action[
       players,
     )
 
-  for (let openerIndex = 0; openerIndex < POSITIONS.length - 1; openerIndex++) {
-    const opener = POSITIONS[openerIndex]
+  for (let openerIndex = 0; openerIndex < positions.length - 1; openerIndex++) {
+    const opener = positions[openerIndex]
     const rfi = solution.rfi[opener]
     if (!rfi) {
       autoFold([opener])
@@ -124,7 +134,7 @@ export function walkPreflop(solution: PreflopSolution, choices: readonly Action[
     if (!openAction) return deciding(opener, rfiStrategy)
     if (openAction.kind === 'fold') continue
 
-    const behind = POSITIONS.slice(openerIndex + 1)
+    const behind = positions.slice(openerIndex + 1)
     const callers: Position[] = []
     let threeBettor: Position | null = null
     for (let i = 0; i < behind.length && !threeBettor; i++) {
@@ -173,5 +183,5 @@ export function walkPreflop(solution: PreflopSolution, choices: readonly Action[
     if (stillIn.length === 0) return finished(`${threeBettor} がポットを獲得`)
     return toFlop([...stillIn, threeBettor], '（3ベットポット）')
   }
-  return finished('全員フォールド。BB がポットを獲得')
+  return finished(`全員フォールド。${positions[positions.length - 1]} がポットを獲得`)
 }

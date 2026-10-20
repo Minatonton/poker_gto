@@ -1,4 +1,4 @@
-import { POSITIONS, walkPreflop, type Position, type PreflopSolution, type Walk } from './preflop'
+import { walkPreflop, type Position, type PreflopSolution, type Walk } from './preflop'
 import type { ActionKind } from './strategy'
 
 /**
@@ -17,7 +17,6 @@ export interface PreflopLine {
   callerReply?: ActionKind
 }
 
-const MAX_DECISIONS = POSITIONS.length * 2
 
 /**
  * ラインに沿う choices を作る。間のプレイヤーはフォールドとして埋める。
@@ -27,7 +26,8 @@ const MAX_DECISIONS = POSITIONS.length * 2
  */
 export function choicesForLine(solution: PreflopSolution, line: PreflopLine): ActionKind[] {
   const choices: ActionKind[] = []
-  for (let i = 0; i < MAX_DECISIONS; i++) {
+  // 1人あたり最大2回（最初の判断と、3ベットやスクイーズへの対応）
+  for (let i = 0; i < solution.positions.length * 2; i++) {
     const walk = walkPreflop(solution, choices)
     if (walk.status !== 'deciding') break
     const kind = nextChoice(walk, line)

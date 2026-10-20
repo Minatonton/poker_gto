@@ -1,4 +1,4 @@
-import { POSITIONS, type Position, type PreflopSolution } from '../poker/preflop'
+import type { Position, PreflopSolution } from '../poker/preflop'
 import type { PreflopLine } from '../poker/preflopLine'
 import type { ActionKind } from '../poker/strategy'
 import { Segmented } from './Segmented'
@@ -13,14 +13,15 @@ const positionOptions = (positions: readonly Position[]) => positions.map((p) =>
 
 /** 誰がオープンし、誰がどう応じたかを選んでラインを作る。上の段を変えたら下の段は選び直しにする */
 export function ScenarioPicker({ solution, line, onChange }: Props) {
-  const openers = POSITIONS.filter((p) => solution.rfi[p])
-  const responders = line.opener ? POSITIONS.filter((p) => solution.vsOpen[line.opener!]?.[p]) : []
+  const positions = solution.positions
+  const openers = positions.filter((p) => solution.rfi[p])
+  const responders = line.opener ? positions.filter((p) => solution.vsOpen[line.opener!]?.[p]) : []
   const responseSpec = line.opener && line.responder ? solution.vsOpen[line.opener]?.[line.responder] : undefined
   const raiser = line.response === 'raise' ? line.responder : line.overcallAction === 'raise' ? line.overcaller : undefined
   const hasReply = line.opener && raiser ? Boolean(solution.vs3bet[line.opener]?.[raiser]) : false
   const overcallers =
     line.response === 'call' && line.responder
-      ? POSITIONS.slice(POSITIONS.indexOf(line.responder) + 1).filter((p) => solution.vsOpenCall?.[p])
+      ? positions.slice(positions.indexOf(line.responder) + 1).filter((p) => solution.vsOpenCall?.[p])
       : []
   const overcallSpec = line.overcaller ? solution.vsOpenCall?.[line.overcaller] : undefined
   const base = { opener: line.opener, responder: line.responder, response: line.response }

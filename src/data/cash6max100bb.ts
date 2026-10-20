@@ -1,4 +1,4 @@
-import type { Position, PreflopSolution, SpotSpec } from '../poker/preflop'
+import { POSITIONS, type Position, type PreflopSolution, type SpotSpec } from '../poker/preflop'
 
 /*
  * 一般に知られている 6-max 100bb キャッシュ（レーキあり）の標準的なレンジをもとにした近似値。
@@ -133,7 +133,7 @@ interface Vs3betTemplate {
   outOfPosition?: SpotSpec
 }
 
-const vs3betTemplates: Record<Exclude<Position, 'BB'>, Vs3betTemplate> = {
+const vs3betTemplates: Partial<Record<Position, Vs3betTemplate>> = {
   UTG: {
     outOfPosition: {
       raiseTo: 22,
@@ -230,6 +230,7 @@ function buildVs3bet(): PreflopSolution['vs3bet'] {
   for (const [opener, responders] of Object.entries(vsOpen) as [Position, Partial<Record<Position, SpotSpec>>][]) {
     if (opener === 'BB') continue
     const template = vs3betTemplates[opener]
+    if (!template) continue
     for (const threeBettor of Object.keys(responders) as Position[]) {
       const openerHasPosition = opener !== 'SB' && BLINDS.includes(threeBettor)
       const spec = openerHasPosition ? template.inPosition : template.outOfPosition
@@ -241,6 +242,7 @@ function buildVs3bet(): PreflopSolution['vs3bet'] {
 
 export const cash6max100bb: PreflopSolution = {
   name: 'Cash 6-max 100bb',
+  positions: POSITIONS,
   rfi,
   vsOpen,
   vs3bet: buildVs3bet(),

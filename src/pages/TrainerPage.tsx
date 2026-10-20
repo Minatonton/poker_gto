@@ -5,9 +5,8 @@ import { PokerTable, type SeatView } from '../components/table/PokerTable'
 import { preflopSeats } from '../components/table/preflopSeats'
 import { Segmented } from '../components/Segmented'
 import { StudyView } from '../components/StudyView'
-import { cash6max100bb } from '../data/cash6max100bb'
 import { cardFromId, cardToId, displayBoard, isSameHoleCards } from '../poker/cards'
-import { POSITIONS, rangeOfPosition, type Position } from '../poker/preflop'
+import { rangeOfPosition, type Position, type PreflopSolution } from '../poker/preflop'
 import type { PostflopSpot } from '../poker/postflopSpot'
 import type { Action } from '../poker/strategy'
 import { toActions, toBb } from '../solver/aggregate'
@@ -18,7 +17,7 @@ import { dealNextCard, dealPostflopHands, villainAction } from '../trainer/postf
 import { createPreflopQuestion, PREFLOP_DRILLS, type PreflopDrillKind, type PreflopQuestion } from '../trainer/preflopDrill'
 import { explainPostflop, explainPreflop } from '../trainer/explain'
 import { equityVsRange } from '../poker/equity'
-import { seatsFromBottom, tableState } from '../poker/table'
+import { dealerOf, seatOf, seatsFromBottom, tableState } from '../poker/table'
 import { classifyHand } from '../poker/handCategory'
 import { breakdownNode } from '../solver/breakdown'
 
@@ -48,12 +47,13 @@ function saveStats(stats: Record<Mode, Stats>) {
 }
 
 interface Props {
+  solution: PreflopSolution
   /** ポストフロップで直近にソルブしたスポット */
   solvedSpot: PostflopSpot | null
   onOpenPostflop: () => void
 }
 
-export function TrainerPage({ solvedSpot, onOpenPostflop }: Props) {
+export function TrainerPage({ solution, solvedSpot, onOpenPostflop }: Props) {
   const [mode, setMode] = useState<Mode>('preflop')
   const [useRng, setUseRng] = useState(false)
   const [stats, setStats] = useState(loadStats)
@@ -93,7 +93,7 @@ export function TrainerPage({ solvedSpot, onOpenPostflop }: Props) {
       <div className="trainer-layout">
         <div className="trainer-main">
           {mode === 'preflop' ? (
-            <PreflopTrainer useRng={useRng} onGrade={record} />
+            <PreflopTrainer solution={solution} useRng={useRng} onGrade={record} />
           ) : solvedSpot ? (
             <PostflopTrainer spot={solvedSpot} useRng={useRng} onGrade={record} />
           ) : (
@@ -120,7 +120,15 @@ export function TrainerPage({ solvedSpot, onOpenPostflop }: Props) {
 
 const rollRng = () => Math.random()
 
-function PreflopTrainer({ useRng, onGrade }: { useRng: boolean; onGrade: (grade: Grade) => void }) {
+function PreflopTrainer({
+  solution,
+  useRng,
+  onGrade,
+}: {
+  solution: PreflopSolution
+  useRng: boolean
+  onGrade: (grade: Grade) => void
+}) {
   const [kind, setKind] = useState<PreflopDrillKind>('rfi')
   const [seat, setSeat] = useState<Position | 'random'>('random')
   const [question, setQuestion] = useState<PreflopQuestion | null>(null)
@@ -131,14 +139,14 @@ function PreflopTrainer({ useRng, onGrade }: { useRng: boolean; onGrade: (grade:
 
   const next = useCallback(
     (nextKind = kind, nextSeat = seat) => {
-      const created = createPreflopQuestion(cash6max100bb, nextKind, nextSeat === 'random' ? null : nextSeat)
+      const created = createPreflopQuestion(solution, nextKind, nextSeat === 'random' ? null : nextSeat)
       setError(created ? '' : 'この席には、この種類の手番が来ません。席か出題の種類を変えてください。')
       setQuestion(created)
       setAnswer(null)
       setShowRange(false)
       setRng(rollRng())
     },
-    [kind, seat],
+    [kind, seat, solution],
   )
 
   useEffect(() => {
@@ -170,7 +178,7 @@ function PreflopTrainer({ useRng, onGrade }: { useRng: boolean; onGrade: (grade:
           />
           <Segmented<Position | 'random'>
             label="自分の席"
-            options={[{ value: 'random', label: 'ランダム' }, ...POSITIONS.map((p) => ({ value: p, label: p }))]}
+            options={[{ value: 'random', label: 'ランダム' }, ...solution.positions.map((p) => ({ value: p, label: p }))]}
             value={seat}
             onChange={(value) => {
               setSeat(value)
@@ -230,12 +238,12 @@ function preflopExplanation(question: PreflopQuestion, frequencies: number[], ch
   const { walk, hand, cards } = question
   const hero = walk.position
   const lastRaise = walk.steps.findLast((s) => s.action.kind === 'raise' && s.position !== hero)
-  const playersBehind = POSITIONS.length - 1 - POSITIONS.indexOf(hero)
+  const playersBehind = walk.positions.length - 1 - walk.positions.indexOf(hero)
   if (!lastRaise) {
     return explainPreflop({ hand, actions: walk.strategy.actions, frequencies, chosen, playersBehind })
   }
-  const state = tableState(walk.steps)
-  const toCall = state.currentBet - state.seats[hero].invested
+  const state = tableState(walk.steps, walk.positions)
+  const toCall = state.currentBet - seatOf(state, hero).invested
   let equity: number | undefined
   try {
     const ids = cards.map(cardToId) as [number, number]
@@ -257,7 +265,8 @@ function preflopExplanation(question: PreflopQuestion, frequencies: number[], ch
 }
 
 function PreflopQuestionTable({ question }: { question: PreflopQuestion }) {
-  const { seats, pot } = preflopSeats(question.walk.steps, question.walk.position, question.walk.position, question.cards)
+  const { walk } = question
+  const { seats, pot } = preflopSeats(walk.steps, walk.positions, walk.position, walk.position, question.cards)
   return <PokerTable seats={seats} pot={pot} />
 }
 
@@ -629,11 +638,13 @@ function PostflopTrainer({
 function postflopSeats(spot: PostflopSpot, hand: HandState): SeatView[] {
   const heroPosition = hand.heroSide === 0 ? spot.oop : spot.ip
   const ended = hand.node.kind === 'terminal'
-  return seatsFromBottom(heroPosition).map((position) => {
+  const dealer = dealerOf(spot.positions)
+  return seatsFromBottom(spot.positions, heroPosition).map((position) => {
     const side = position === spot.oop ? 0 : position === spot.ip ? 1 : null
     const acting = hand.node.kind === 'player' && side === hand.node.player
     return {
       position,
+      dealer: position === dealer,
       stack: side === null ? null : spot.effectiveStackBb - toBb(hand.node.bets[side]),
       bet: 0,
       folded: side === null,

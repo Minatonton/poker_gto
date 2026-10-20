@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { walkPreflop, type PreflopSolution } from './preflop'
+import { POSITIONS, walkPreflop, type PreflopSolution } from './preflop'
 
 const solution: PreflopSolution = {
   name: 'test',
+  positions: POSITIONS,
   rfi: {
     UTG: { raiseTo: 2.5, raise: 'AA' },
     BTN: { raiseTo: 2.5, raise: 'AA, KK' },

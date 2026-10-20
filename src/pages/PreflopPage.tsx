@@ -8,14 +8,14 @@ import { HoleCardPicker } from '../components/table/HoleCardPicker'
 import { PokerTable } from '../components/table/PokerTable'
 import { preflopSeats } from '../components/table/preflopSeats'
 import { BoardCards } from '../components/postflop/Cards'
-import { cash6max100bb } from '../data/cash6max100bb'
 import { heroHandFor, type Hero, type HeroInput } from '../poker/hero'
 import { spotFromWalk, type PostflopSpot } from '../poker/postflopSpot'
-import type { Position, Walk } from '../poker/preflop'
+import type { Position, PreflopSolution, Walk } from '../poker/preflop'
 import type { PreflopLine } from '../poker/preflopLine'
 import type { ActionKind } from '../poker/strategy'
 
 interface Props {
+  solution: PreflopSolution
   walk: Walk
   choices: ActionKind[]
   line: PreflopLine
@@ -28,6 +28,7 @@ interface Props {
 }
 
 export function PreflopPage({
+  solution,
   walk,
   choices,
   line,
@@ -44,7 +45,7 @@ export function PreflopPage({
   const spotAtFlop = spotFromWalk(walk)
   const actor = walk.status === 'deciding' ? walk.position : null
   const heroHand = actor ? heroHandFor(hero, actor) : null
-  const { seats, pot } = preflopSeats(walk.steps, actor, hero.position, hero.cards)
+  const { seats, pot } = preflopSeats(walk.steps, walk.positions, actor, hero.position, hero.cards)
 
   let choiceCount = 0
   const history: HistoryEntry[] = walk.steps.map((step) => {
@@ -153,7 +154,7 @@ export function PreflopPage({
 
           <details className="card shortcut">
             <summary className="card-header">シチュエーションを一気に選ぶ</summary>
-            <ScenarioPicker solution={cash6max100bb} line={line} onChange={onLine} />
+            <ScenarioPicker solution={solution} line={line} onChange={onLine} />
           </details>
         </div>
       </div>

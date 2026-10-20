@@ -1,4 +1,4 @@
-import { POSITIONS, walkPreflop, type Position, type PreflopSolution, type Walk } from '../poker/preflop'
+import { walkPreflop, type Position, type PreflopSolution, type Walk } from '../poker/preflop'
 import { choicesForLine, type PreflopLine } from '../poker/preflopLine'
 import type { ActionKind } from '../poker/strategy'
 import { dealFromRange } from './sampling'
@@ -32,23 +32,24 @@ export function drillChoices(
   hero: Position | null,
   random = Math.random,
 ): ActionKind[] | null {
-  const openers = POSITIONS.filter((p) => solution.rfi[p])
+  const positions = solution.positions
+  const openers = positions.filter((p) => solution.rfi[p])
   if (kind === 'rfi') {
     const opener = hero ?? pick(openers, random)
     if (!opener || !solution.rfi[opener]) return null
-    const foldsBefore = openers.filter((p) => POSITIONS.indexOf(p) < POSITIONS.indexOf(opener)).length
+    const foldsBefore = openers.filter((p) => positions.indexOf(p) < positions.indexOf(opener)).length
     return Array<ActionKind>(foldsBefore).fill('fold')
   }
 
   const lines: PreflopLine[] = []
   for (const opener of openers) {
-    for (const responder of POSITIONS.filter((p) => solution.vsOpen[opener]?.[p])) {
+    for (const responder of positions.filter((p) => solution.vsOpen[opener]?.[p])) {
       if (kind === 'vsOpen') lines.push({ opener, responder })
       if (kind === 'vs3bet' && solution.vs3bet[opener]?.[responder]) {
         lines.push({ opener, responder, response: 'raise' })
       }
       if (kind === 'squeeze' && solution.vsOpen[opener]?.[responder]?.call) {
-        const after = POSITIONS.slice(POSITIONS.indexOf(responder) + 1)
+        const after = positions.slice(positions.indexOf(responder) + 1)
         for (const overcaller of after.filter((p) => solution.vsOpenCall?.[p])) {
           lines.push({ opener, responder, response: 'call', overcaller })
         }

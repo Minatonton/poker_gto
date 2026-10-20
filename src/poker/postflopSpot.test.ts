@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { spotFromWalk, toRangeNotation } from './postflopSpot'
 import { cash6max100bb } from '../data/cash6max100bb'
-import { walkPreflop, type PreflopSolution } from './preflop'
+import { POSITIONS, walkPreflop, type PreflopSolution } from './preflop'
 import { choicesForLine } from './preflopLine'
 
 const solution: PreflopSolution = {
   name: 'test',
+  positions: POSITIONS,
   rfi: { BTN: { raiseTo: 2.5, raise: 'AA, KK, QQ:0.5, 72o' } },
   vsOpen: { BTN: { BB: { raiseTo: 11, raise: 'AA', call: 'KK, QQ, AKs' } } },
   vs3bet: { BTN: { BB: { raiseTo: 24, raise: 'KK', call: 'AA, QQ' } } },

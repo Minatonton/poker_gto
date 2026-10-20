@@ -2,27 +2,26 @@ import { useEffect, useMemo, useState } from 'react'
 import { actionColor, formatPercent } from '../components/actionColors'
 import { RangeGrid } from '../components/RangeGrid'
 import { Segmented } from '../components/Segmented'
-import { cash6max100bb } from '../data/cash6max100bb'
 import type { HandClass } from '../poker/hands'
-import { POSITIONS, walkPreflop, type Position, type Walk } from '../poker/preflop'
+import { walkPreflop, type Position, type PreflopSolution, type Walk } from '../poker/preflop'
 import type { Strategy } from '../poker/strategy'
 import { drillChoices, PREFLOP_DRILLS, type PreflopDrillKind } from '../trainer/preflopDrill'
 import { emptyPainting, matchScore, mistakes, paint, PAINT_AMOUNTS } from '../trainer/rangeDrill'
 
 type DecidingWalk = Extract<Walk, { status: 'deciding' }>
 
-function newSpot(kind: PreflopDrillKind, seat: Position | 'random'): DecidingWalk | null {
-  const choices = drillChoices(cash6max100bb, kind, seat === 'random' ? null : seat)
+function newSpot(solution: PreflopSolution, kind: PreflopDrillKind, seat: Position | 'random'): DecidingWalk | null {
+  const choices = drillChoices(solution, kind, seat === 'random' ? null : seat)
   if (!choices) return null
-  const walk = walkPreflop(cash6max100bb, choices)
+  const walk = walkPreflop(solution, choices)
   return walk.status === 'deciding' ? walk : null
 }
 
 /** 塗り絵でレンジを再現し、GTO との一致率で採点する */
-export function RangeDrillPage() {
+export function RangeDrillPage({ solution }: { solution: PreflopSolution }) {
   const [kind, setKind] = useState<PreflopDrillKind>('rfi')
   const [seat, setSeat] = useState<Position | 'random'>('random')
-  const [walk, setWalk] = useState<DecidingWalk | null>(() => newSpot('rfi', 'random'))
+  const [walk, setWalk] = useState<DecidingWalk | null>(() => newSpot(solution, 'rfi', 'random'))
   const [painting, setPainting] = useState(() => (walk ? emptyPainting(walk.strategy) : new Map()))
   const [brushAction, setBrushAction] = useState(0)
   const [brushAmount, setBrushAmount] = useState<number>(1)
@@ -36,7 +35,7 @@ export function RangeDrillPage() {
   }, [])
 
   const start = (nextKind = kind, nextSeat = seat) => {
-    const next = newSpot(nextKind, nextSeat)
+    const next = newSpot(solution, nextKind, nextSeat)
     setWalk(next)
     setPainting(next ? emptyPainting(next.strategy) : new Map())
     setBrushAction(0)
@@ -76,7 +75,7 @@ export function RangeDrillPage() {
           />
           <Segmented<Position | 'random'>
             label="手番の席"
-            options={[{ value: 'random', label: 'ランダム' }, ...POSITIONS.map((p) => ({ value: p, label: p }))]}
+            options={[{ value: 'random', label: 'ランダム' }, ...solution.positions.map((p) => ({ value: p, label: p }))]}
             value={seat}
             onChange={(value) => {
               setSeat(value)

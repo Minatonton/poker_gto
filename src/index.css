@@ -1444,13 +1444,6 @@ textarea {
   transform: translate(-50%, -50%);
 }
 
-.slot-0 { left: 50%; top: 90%; }
-.slot-1 { left: 9%; top: 72%; }
-.slot-2 { left: 9%; top: 26%; }
-.slot-3 { left: 50%; top: 9%; }
-.slot-4 { left: 91%; top: 26%; }
-.slot-5 { left: 91%; top: 72%; }
-
 .seat {
   position: relative;
   display: flex;
@@ -1560,6 +1553,8 @@ textarea {
 
 .seat-bet {
   position: absolute;
+  z-index: 1;
+  transform: translate(-50%, -50%);
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -1571,12 +1566,22 @@ textarea {
   border-radius: 999px;
 }
 
-.bet-0 { left: 50%; bottom: calc(100% + 14px); transform: translateX(-50%); }
-.bet-1 { left: calc(100% + 8px); top: 10%; }
-.bet-2 { left: calc(100% + 8px); top: 60%; }
-.bet-3 { left: 50%; top: calc(100% + 10px); transform: translateX(-50%); }
-.bet-4 { right: calc(100% + 8px); top: 60%; }
-.bet-5 { right: calc(100% + 8px); top: 10%; }
+/* 席が多い卓では、隣の席と重ならないように席を小さくする */
+.poker-table.crowded .seat-plate {
+  min-width: 78px;
+  padding: 4px 8px;
+}
+
+.poker-table.crowded .seat {
+  min-width: 78px;
+}
+
+.poker-table.crowded .seat-cards .playing-card,
+.poker-table.crowded .card-back {
+  width: 28px;
+  height: 38px;
+  font-size: 13px;
+}
 
 .chip {
   width: 16px;
@@ -1856,4 +1861,16 @@ textarea {
   font-size: 13px;
   line-height: 1.7;
   color: var(--body);
+}
+
+.players-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--label);
+}
+
+.players-select select {
+  height: 30px;
 }

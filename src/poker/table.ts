@@ -1,4 +1,4 @@
-import { POSITIONS, type Position, type Step } from './preflop'
+import type { Position, Step } from './preflop'
 import type { Action } from './strategy'
 
 export const STARTING_STACK_BB = 100
@@ -16,27 +16,29 @@ export interface SeatState {
 }
 
 export interface TableState {
-  seats: Record<Position, SeatState>
+  /** 卓にいる席だけを持つ。席の取り出しは seatOf を使う */
+  seats: Partial<Record<Position, SeatState>>
   pot: number
   /** いま最も高いベット額（bb）。コールに必要な額の基準 */
   currentBet: number
 }
 
 /** プリフロップのアクションの履歴から、テーブルの各席の状態を求める */
-export function tableState(steps: readonly Step[]): TableState {
+export function tableState(steps: readonly Step[], positions: readonly Position[]): TableState {
   const seats = Object.fromEntries(
-    POSITIONS.map((position) => {
+    positions.map((position) => {
       const invested = BLINDS[position] ?? 0
       return [
         position,
         { position, invested, stack: STARTING_STACK_BB - invested, folded: false, lastAction: null, autoFolded: false },
       ]
     }),
-  ) as Record<Position, SeatState>
+  ) as TableState['seats']
 
   let currentBet = BLINDS.BB ?? 1
   for (const step of steps) {
     const seat = seats[step.position]
+    if (!seat) continue
     seat.lastAction = step.action
     if (step.action.kind === 'fold') {
       seat.folded = true
@@ -50,12 +52,23 @@ export function tableState(steps: readonly Step[]): TableState {
     seat.stack = STARTING_STACK_BB - seat.invested
   }
 
-  const pot = Object.values(seats).reduce((sum, seat) => sum + seat.invested, 0)
+  const pot = Object.values(seats).reduce((sum, seat) => sum + (seat?.invested ?? 0), 0)
   return { seats, pot, currentBet }
 }
 
-/** 6つの席を、指定した席がテーブルの手前（下）に来るように時計回りに並べ替える */
-export function seatsFromBottom(bottom: Position): Position[] {
-  const start = POSITIONS.indexOf(bottom)
-  return POSITIONS.map((_, i) => POSITIONS[(start + i) % POSITIONS.length])
+export function seatOf(state: TableState, position: Position): SeatState {
+  const seat = state.seats[position]
+  if (!seat) throw new Error(`${position} はこの卓にいません`)
+  return seat
+}
+
+/** 卓の席を、指定した席がテーブルの手前（下）に来るように時計回りに並べ替える */
+export function seatsFromBottom(positions: readonly Position[], bottom: Position): Position[] {
+  const start = Math.max(0, positions.indexOf(bottom))
+  return positions.map((_, i) => positions[(start + i) % positions.length])
+}
+
+/** ディーラーボタンの席。ヘッズアップでは SB がボタンを兼ねる */
+export function dealerOf(positions: readonly Position[]): Position {
+  return positions.includes('BTN') ? 'BTN' : 'SB'
 }

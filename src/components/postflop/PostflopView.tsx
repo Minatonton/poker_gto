@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { cardFromId, displayBoard, isSameHoleCards } from '../../poker/cards'
 import { heroHandFor, type Hero } from '../../poker/hero'
 import type { PostflopSpot } from '../../poker/postflopSpot'
-import { seatsFromBottom } from '../../poker/table'
+import { dealerOf, seatsFromBottom } from '../../poker/table'
 import { aggregateNode, toActions, toBb } from '../../solver/aggregate'
 import { SolverClient, type SolvedStatus } from '../../solver/client'
 import type { NodeInfo, PlayerNode, SolveOptions, SolverStatus, SpotConfig } from '../../solver/types'
@@ -218,11 +218,13 @@ function PostflopTable({
   const streetActions = path.slice(path.findLastIndex((e) => e.kind === 'card') + 1)
   const folded = streetActions.find((e) => e.kind === 'action' && e.label === 'Fold')
 
-  const seats: SeatView[] = seatsFromBottom(hero.position ?? spot.ip).map((position) => {
+  const dealer = dealerOf(spot.positions)
+  const seats: SeatView[] = seatsFromBottom(spot.positions, hero.position ?? spot.ip).map((position) => {
     const side = position === spot.oop ? 0 : position === spot.ip ? 1 : null
     const last = streetActions.findLast((e) => e.kind === 'action' && e.actor === position)
     return {
       position,
+      dealer: position === dealer,
       stack: side === null ? null : spot.effectiveStackBb - toBb(node.bets[side]),
       bet: side === null ? 0 : toBb(streetBets[side]),
       folded: side === null || (folded?.kind === 'action' && folded.actor === position),
