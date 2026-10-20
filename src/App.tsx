@@ -4,6 +4,7 @@ import { PostflopView } from './components/postflop/PostflopView'
 import { cash6max100bb } from './data/cash6max100bb'
 import { CalculatorsPage } from './pages/CalculatorsPage'
 import { PreflopPage } from './pages/PreflopPage'
+import { TrainerPage } from './pages/TrainerPage'
 import { parseHero, type HeroInput } from './poker/hero'
 import type { PostflopSpot } from './poker/postflopSpot'
 import { walkPreflop } from './poker/preflop'
@@ -18,6 +19,7 @@ export default function App() {
   // 「応じた人」だけを選んでアクションが未定のときは、辿ったラインからは選択を読み戻せないため、
   // 選択欄で選んだ内容を別に持つ。アクションラインで直接進めたら、辿ったラインの表示に戻す
   const [pickedLine, setPickedLine] = useState<PreflopLine | null>(null)
+  const [solvedSpot, setSolvedSpot] = useState<PostflopSpot | null>(null)
 
   const walk = useMemo(() => walkPreflop(cash6max100bb, choices), [choices])
   const line = useMemo(() => pickedLine ?? lineOfWalk(walk), [pickedLine, walk])
@@ -79,7 +81,12 @@ export default function App() {
             {postflopSpot && <span className="caption">{postflopSpot.spot.name}</span>}
           </div>
           {postflopSpot ? (
-            <PostflopView key={postflopSpot.id} spot={postflopSpot.spot} hero={hero} />
+            <PostflopView
+              key={postflopSpot.id}
+              spot={postflopSpot.spot}
+              hero={hero}
+              onSolved={() => setSolvedSpot(postflopSpot.spot)}
+            />
           ) : (
             <section className="card empty-state">
               <p>プリフロップでフロップまで進むラインを選ぶと、そのスポットをここでソルブできます。</p>
@@ -88,6 +95,10 @@ export default function App() {
               </button>
             </section>
           )}
+        </main>
+
+        <main className="page" hidden={page !== 'trainer'}>
+          <TrainerPage solvedSpot={solvedSpot} onOpenPostflop={() => setPage('postflop')} />
         </main>
 
         <main className="page" hidden={page !== 'calculators'}>

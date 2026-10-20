@@ -26,7 +26,14 @@ type PathEntry =
   | { kind: 'action'; choice: number; actor: string; label: string; color: string }
   | { kind: 'card'; choice: number; card: string }
 
-export function PostflopView({ spot, hero }: { spot: PostflopSpot; hero: Hero }) {
+interface Props {
+  spot: PostflopSpot
+  hero: Hero
+  /** ソルブが終わり、サーバーにこのスポットの解が載ったとき */
+  onSolved?: () => void
+}
+
+export function PostflopView({ spot, hero, onSolved }: Props) {
   const clientRef = useRef<SolverClient | null>(null)
   const [phase, setPhase] = useState<Phase>({ name: 'setup' })
   const [error, setError] = useState('')
@@ -59,6 +66,7 @@ export function PostflopView({ spot, hero }: { spot: PostflopSpot; hero: Hero })
         if (status.state === 'solving') setPhase((p) => (p.name === 'solving' ? { ...p, status } : p))
       })
       setPhase({ name: 'solved', startingPot, result })
+      onSolved?.()
     } catch (e) {
       setError((e as Error).message)
       setPhase({ name: 'setup' })

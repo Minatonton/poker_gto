@@ -1236,3 +1236,137 @@ textarea {
   align-items: center;
   gap: 8px;
 }
+
+/* ---------- トレーナー ---------- */
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--sub);
+}
+
+.checkbox-row input {
+  width: 16px;
+  height: 16px;
+}
+
+.trainer-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 1000px) {
+  .trainer-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.trainer-main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.step.static {
+  cursor: default;
+}
+
+.log-step {
+  border-left-color: var(--line-strong);
+}
+
+.question {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 16px;
+  border-top: 1px solid var(--mist);
+}
+
+.question-hand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.question-cards {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.question-cards .playing-card {
+  width: 46px;
+  height: 62px;
+  font-size: 22px;
+}
+
+.question-board {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rng {
+  padding: 4px 10px;
+  font-family: var(--mono);
+  font-size: 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+}
+
+.question-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.choice.answer {
+  min-width: 120px;
+  padding: 12px 16px;
+  border-bottom: 3px solid var(--action);
+}
+
+.choice.answer:disabled {
+  opacity: 0.5;
+}
+
+.feedback {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border-top: 1px solid var(--mist);
+  border-left: 3px solid var(--line-strong);
+}
+
+.feedback.grade-best,
+.feedback.grade-correct {
+  border-left-color: var(--action-call);
+}
+
+.feedback.grade-wrong,
+.feedback.grade-blunder {
+  border-left-color: var(--action-raise);
+}
+
+.feedback-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.feedback-head strong {
+  font-size: 18px;
+}
+
+.stats-list {
+  padding: 0 16px 8px;
+  border-top: none;
+}
