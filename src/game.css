@@ -1153,3 +1153,66 @@ main.page {
     transform: none;
   }
 }
+
+/* ---------- サイズを選ぶ ---------- */
+
+.stage-controls .action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 10px;
+}
+
+.stage-controls .action-buttons > .action-button {
+  flex: 0 1 180px;
+  min-width: 130px;
+}
+
+/* ベットとレイズの額は、1つのまとまりの中に並べる。額を選ぶことが1つの判断だと見て分かるように */
+.size-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px 10px;
+  background: color-mix(in srgb, var(--action) 6%, #111215);
+  border: 1px solid color-mix(in srgb, var(--action) 25%, #26292f);
+  border-radius: 14px;
+}
+
+.size-panel-title {
+  padding-left: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: color-mix(in srgb, var(--action) 40%, var(--sub));
+}
+
+.size-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.stage-controls .size-option {
+  min-width: 92px;
+  padding: 10px 12px 8px;
+  font-size: 14px;
+}
+
+.size-gto {
+  position: absolute;
+  top: -7px;
+  right: -6px;
+  padding: 0 6px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--on-accent);
+  background: var(--accent);
+  border-radius: 999px;
+}
+
+.stage-controls .size-option {
+  overflow: visible;
+}

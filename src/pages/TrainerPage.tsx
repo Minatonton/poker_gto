@@ -14,7 +14,8 @@ import type { Action } from '../poker/strategy'
 import { toActions, toBb } from '../solver/aggregate'
 import { SolverClient } from '../solver/client'
 import type { NodeInfo } from '../solver/types'
-import { GRADES, actionForRng, gradeByEv, gradeByFrequency, type Grade } from '../trainer/grading'
+import { GRADES, actionForRng, gradeByEv, gradeByFrequency, withSizing, type Grade } from '../trainer/grading'
+import { isGtoSize, preflopSizeChoices } from '../poker/betSizing'
 import {
   accuracy,
   DAILY_GOAL,
@@ -290,7 +291,14 @@ function SessionCard({ answers, progress }: { answers: SessionAnswer[]; progress
 
 const rollRng = () => Math.random()
 
-type PreflopAnswer = { chosen: number; grade: Grade; explanation: string[] }
+/** レイズの額を選ばせる候補。データの額を答えとして、ほかの候補と並べる */
+function raiseSizesOf(question: PreflopQuestion): number[] | undefined {
+  const raise = question.walk.strategy.actions.find((a) => a.kind === 'raise')
+  if (raise?.amount === undefined) return undefined
+  return preflopSizeChoices(raise.amount, tableState(question.walk.steps, question.walk.positions).currentBet)
+}
+
+type PreflopAnswer = { chosen: number; grade: Grade; explanation: string[]; amount?: number; sizeMiss?: boolean }
 
 function PreflopTrainer({
   solution,
@@ -331,10 +339,30 @@ function PreflopTrainer({
   }, [])
 
   const frequencies = question ? (question.walk.strategy.frequencies.get(question.hand) ?? []) : []
-  const choose = (index: number) => {
+  const choose = (index: number, amount?: number) => {
     if (!question || answer) return
-    const grade = gradeByFrequency(frequencies, index, useRng ? rng : undefined)
-    setAnswer({ chosen: index, grade, explanation: preflopExplanation(question, frequencies, index) })
+    const gtoAmount = question.walk.strategy.actions[index].amount
+    const sizeIsGto = amount === undefined || gtoAmount === undefined || isGtoSize(amount, gtoAmount)
+    const actionGrade = gradeByFrequency(frequencies, index, useRng ? rng : undefined)
+    const grade = withSizing(actionGrade, sizeIsGto)
+    // レイズ自体が間違いのときは、サイズより先に直すことがあるので、サイズの説明は出さない
+    const sizeMatters = !sizeIsGto && grade !== actionGrade
+    const sizeLine = sizeMatters
+      ? [
+          `レイズは正解ですが、サイズは ${gtoAmount}bb が GTO の基準です。選んだ ${amount}bb では、${
+            amount! > gtoAmount!
+              ? '弱い手に降りられやすく、強い手にだけ続けられます'
+              : '相手に安くついて来られ、主導権の価値が下がります'
+          }。`,
+        ]
+      : []
+    setAnswer({
+      chosen: index,
+      grade,
+      amount,
+      sizeMiss: sizeMatters,
+      explanation: [...sizeLine, ...preflopExplanation(question, frequencies, index)],
+    })
     setTab('range')
     onGrade(grade)
   }
@@ -369,6 +397,8 @@ function PreflopTrainer({
                   grade={answer.grade}
                   streak={progress.streak}
                   gain={gain}
+                  chosenAmount={answer.amount}
+                  sizeMiss={answer.sizeMiss}
                   actions={question.walk.strategy.actions}
                   frequencies={frequencies}
                   chosen={answer.chosen}
@@ -386,7 +416,7 @@ function PreflopTrainer({
         summary ? (
           <NextBar label="次の10問へ" onNext={summary.onClose} />
         ) : question && !answer ? (
-          <ActionBar actions={question.walk.strategy.actions} onChoose={choose} />
+          <ActionBar actions={question.walk.strategy.actions} sizeChoices={raiseSizesOf(question)} onChoose={choose} />
         ) : (
           <NextBar label="次の問題" onNext={() => gate(() => next())} />
         )
@@ -504,6 +534,8 @@ function ResultCard({
   grade,
   streak,
   gain,
+  chosenAmount,
+  sizeMiss = false,
   actions,
   frequencies,
   evs,
@@ -515,6 +547,10 @@ function ResultCard({
   grade: Grade
   streak: number
   gain: Gain | null
+  /** 額を選ばせたときの、選んだ額（bb） */
+  chosenAmount?: number
+  /** アクションは合っていて、サイズだけで評価を下げたとき */
+  sizeMiss?: boolean
   actions: Action[]
   frequencies: number[]
   evs?: number[]
@@ -528,7 +564,9 @@ function ResultCard({
     <div className={`result-card grade-${grade}`} role="status">
       <div className="result-head">
         <strong className="result-grade">{info.label}</strong>
-        <span className="result-description">{info.description}</span>
+        <span className="result-description">
+          {sizeMiss ? 'アクションは正解。サイズが GTO と違う' : info.description}
+        </span>
         {isGood(grade) && streak >= 2 && <span className="result-streak num">{streak} 連続</span>}
         {gain && <span className="result-xp num">+{gain.xp} XP</span>}
       </div>
@@ -539,7 +577,9 @@ function ResultCard({
           <li key={action.label} className={index === chosen ? 'chosen' : ''}>
             <span className="advice-bar-label">
               {action.label}
-              {index === chosen && <span className="muted small"> あなた</span>}
+              {index === chosen && (
+                <span className="muted small"> あなた{chosenAmount !== undefined && `（${chosenAmount}bb）`}</span>
+              )}
               {index === rngAction && <span className="muted small"> RNG</span>}
             </span>
             <span className="advice-bar-track">

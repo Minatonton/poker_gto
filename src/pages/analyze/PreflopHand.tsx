@@ -16,6 +16,8 @@ import { GameScreen, type DockTab } from '../../components/game/GameScreen'
 import { EquityMeter } from '../../components/table/EquityMeter'
 import { allInCallEv, requiredEquity } from '../../poker/math'
 import { usePreflopEquity, type PreflopEquity } from './usePreflopEquity'
+import { isGtoSize, preflopSizeChoices } from '../../poker/betSizing'
+import { tableState } from '../../poker/table'
 
 export interface PreflopHandProps {
   solution: PreflopSolution
@@ -34,6 +36,7 @@ export function PreflopHand(props: PreflopHandProps) {
   const { solution, walk, choices, line, onLine, onNavigate, heroInput, hero, onHeroInput, onRecord } = props
   const [picking, setPicking] = useState(false)
   const [hidden, setHidden] = useState(false)
+  const [sizeNote, setSizeNote] = useState('')
 
   const actor = walk.status === 'deciding' ? walk.position : null
   const heroHand = actor ? heroHandFor(hero, actor) : null
@@ -60,6 +63,7 @@ export function PreflopHand(props: PreflopHandProps) {
           </>
         )}
         {seatHint && <span className="coach-hint">{seatHint}</span>}
+        {sizeNote && <span className="coach-hint">{sizeNote}</span>}
       </>
     ) : (
       <strong>{walk.result}</strong>
@@ -148,7 +152,17 @@ export function PreflopHand(props: PreflopHandProps) {
           <ActionBar
             actions={walk.strategy.actions}
             disabled={picking}
-            onChoose={(index) => onNavigate([...choices, walk.strategy.actions[index].kind])}
+            sizeChoices={raiseSizes(walk)}
+            markGtoSize
+            onChoose={(index, amount) => {
+              const action = walk.strategy.actions[index]
+              setSizeNote(
+                amount !== undefined && action.amount !== undefined && !isGtoSize(amount, action.amount)
+                  ? `${walk.position} の ${amount}bb はデータにないサイズなので、GTO の ${action.amount}bb として続けています。`
+                  : '',
+              )
+              onNavigate([...choices, action.kind])
+            }}
           />
         ) : (
           <div className="finished-actions">
@@ -195,4 +209,12 @@ function HeroEquity({ hero, heroEquity }: { hero: Hero; heroEquity: PreflopEquit
       }
     />
   )
+}
+
+/** 手番の人のレイズで選べる額。データは1つの額しか持たないので、練習用の候補を並べる */
+function raiseSizes(walk: Walk): number[] | undefined {
+  if (walk.status !== 'deciding') return undefined
+  const raise = walk.strategy.actions.find((a) => a.kind === 'raise')
+  if (raise?.amount === undefined) return undefined
+  return preflopSizeChoices(raise.amount, tableState(walk.steps, walk.positions).currentBet)
 }

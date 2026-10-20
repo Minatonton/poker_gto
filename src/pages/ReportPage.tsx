@@ -153,10 +153,10 @@ export function ReportPage({ spot, onOpenPreflop }: { spot: PostflopSpot | null;
         </div>
         <section className="card empty-state">
           <p>
-            プリフロップの卓でフロップまで進み、「このスポットをソルブする」でスポットを選ぶと、ここで複数のフロップをまとめて解けます。
+            「ハンドを分析」の卓でフロップまでアクションを進めると、そのスポットの複数のフロップを、ここでまとめて解いて見比べられます。
           </p>
           <button className="btn primary" onClick={onOpenPreflop}>
-            プリフロップでラインを選ぶ
+            ハンドを分析する
           </button>
         </section>
       </>

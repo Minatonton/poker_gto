@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { actionForRng, gradeByEv, gradeByFrequency } from './grading'
+import { actionForRng, gradeByEv, gradeByFrequency, withSizing } from './grading'
 
 describe('gradeByFrequency', () => {
   it('最も頻度の高いアクションは Best', () => {
@@ -48,5 +48,20 @@ describe('gradeByEv', () => {
 
   it('EV の損失を返す', () => {
     expect(gradeByEv(frequencies, [10, 9, 0], 2, 10).evLoss).toBe(10)
+  })
+})
+
+describe('withSizing', () => {
+  it('アクションが正しくてもサイズが違えば Inaccuracy に下げる', () => {
+    expect(withSizing('best', false)).toBe('inaccuracy')
+    expect(withSizing('correct', false)).toBe('inaccuracy')
+  })
+
+  it('サイズが GTO どおりなら、アクションの評価のまま', () => {
+    expect(withSizing('best', true)).toBe('best')
+  })
+
+  it('アクション自体が間違いなら、サイズで評価は変えない', () => {
+    expect(withSizing('wrong', false)).toBe('wrong')
   })
 })

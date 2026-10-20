@@ -75,3 +75,12 @@ export function gradeByEv(
   const grade = usedByGto ? GRADE_ORDER[Math.min(GRADE_ORDER.indexOf(byEv), GRADE_ORDER.indexOf(byFrequency))] : byEv
   return { grade, evLoss }
 }
+
+/**
+ * アクションは合っていてもサイズが GTO と違うときは、Inaccuracy に下げる。
+ * 何を選ぶかの判断は正しいので Wrong までは下げない
+ */
+export function withSizing(grade: Grade, sizeIsGto: boolean): Grade {
+  if (sizeIsGto) return grade
+  return grade === 'best' || grade === 'correct' ? 'inaccuracy' : grade
+}
