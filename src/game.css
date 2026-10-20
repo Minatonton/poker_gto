@@ -1076,3 +1076,80 @@ main.page {
     animation: none;
   }
 }
+
+/* ---------- 操作ボタン ---------- */
+
+/*
+ * アクションの色は、面いっぱいに塗らず、深い色をうっすら溶かした地と細い縁取りで見せる。
+ * 原色の太い線は目立つが安っぽく見え、卓の上で色だけが浮くため
+ */
+.stage-controls .action-button {
+  gap: 4px;
+  padding: 14px 16px 12px;
+  font-size: 15px;
+  letter-spacing: 0.03em;
+  color: color-mix(in srgb, var(--action) 30%, #f4f5f7);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--action) 26%, #1c1e22) 0%,
+    color-mix(in srgb, var(--action) 9%, #121316) 100%
+  );
+  border: 1px solid color-mix(in srgb, var(--action) 42%, #2b2e34);
+  border-radius: 12px;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.09),
+    inset 0 -1px 0 rgb(0 0 0 / 0.4),
+    0 8px 20px rgb(0 0 0 / 0.45);
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease;
+}
+
+.stage-controls .action-button:hover:not(:disabled) {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--action) 36%, #202227) 0%,
+    color-mix(in srgb, var(--action) 14%, #141518) 100%
+  );
+  border-color: color-mix(in srgb, var(--action) 70%, #3a3e46);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.12),
+    inset 0 -1px 0 rgb(0 0 0 / 0.4),
+    0 0 0 1px color-mix(in srgb, var(--action) 30%, transparent),
+    0 10px 28px color-mix(in srgb, var(--action) 22%, rgb(0 0 0 / 0.5));
+  transform: translateY(-1px);
+}
+
+.stage-controls .action-button:active:not(:disabled) {
+  box-shadow:
+    inset 0 2px 6px rgb(0 0 0 / 0.5),
+    0 2px 8px rgb(0 0 0 / 0.4);
+  transform: translateY(1px);
+}
+
+.stage-controls .action-button:disabled {
+  opacity: 0.45;
+}
+
+.stage-controls .action-button .action-key {
+  padding: 1px 6px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: color-mix(in srgb, var(--action) 25%, var(--muted));
+  background: rgb(0 0 0 / 0.28);
+  border: 1px solid rgb(255 255 255 / 0.06);
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage-controls .action-button {
+    transition: none;
+  }
+
+  .stage-controls .action-button:hover:not(:disabled),
+  .stage-controls .action-button:active:not(:disabled) {
+    transform: none;
+  }
+}
