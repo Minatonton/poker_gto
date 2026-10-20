@@ -22,6 +22,10 @@ interface Props {
   heroHand: HandClass | null
   onHover: (hand: HandClass | null) => void
   onSelect: (hand: HandClass | null) => void
+  /** セルを押し始めたとき。ドラッグで塗るときに使う */
+  onCellDown?: (hand: HandClass) => void
+  /** 印を付けるハンド（答え合わせで間違えたハンドなど） */
+  markedHands?: ReadonlySet<HandClass>
 }
 
 /** 塗りが左上のラベルまで届かないセルでは、白い文字が背景に埋もれるため濃い文字にする */
@@ -37,9 +41,11 @@ export function RangeGrid({
   heroHand,
   onHover,
   onSelect,
+  onCellDown,
+  markedHands,
 }: Props) {
   return (
-    <div className="range-grid" onMouseLeave={() => onHover(null)}>
+    <div className={`range-grid ${onCellDown ? 'paintable' : ''}`} onMouseLeave={() => onHover(null)}>
       {HAND_GRID.flat().map((hand) => {
         const weight =
           mode === 'range' ? (strategy.frequencies.get(hand)?.[0] ?? 0) : (strategy.weights?.get(hand) ?? 1)
@@ -54,7 +60,11 @@ export function RangeGrid({
         return (
           <button
             key={hand}
-            className={`range-cell ${weight === 0 ? 'unreached' : labelOnBackground ? 'partial' : ''} ${selectedHand === hand ? 'selected' : ''} ${heroHand === hand ? 'hero' : ''}`}
+            className={`range-cell ${weight === 0 ? 'unreached' : labelOnBackground ? 'partial' : ''} ${selectedHand === hand ? 'selected' : ''} ${heroHand === hand ? 'hero' : ''} ${markedHands?.has(hand) ? 'marked' : ''}`}
+            onMouseDown={onCellDown ? (e) => {
+              e.preventDefault()
+              onCellDown(hand)
+            } : undefined}
             onMouseEnter={() => onHover(hand)}
             onFocus={() => onHover(hand)}
             onClick={() => onSelect(selectedHand === hand ? null : hand)}

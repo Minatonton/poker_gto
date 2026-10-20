@@ -4,6 +4,7 @@ import { PostflopView } from './components/postflop/PostflopView'
 import { cash6max100bb } from './data/cash6max100bb'
 import { CalculatorsPage } from './pages/CalculatorsPage'
 import { PreflopPage } from './pages/PreflopPage'
+import { RangeDrillPage } from './pages/RangeDrillPage'
 import { TrainerPage } from './pages/TrainerPage'
 import { parseHero, type HeroInput } from './poker/hero'
 import type { PostflopSpot } from './poker/postflopSpot'
@@ -99,6 +100,10 @@ export default function App() {
 
         <main className="page" hidden={page !== 'trainer'}>
           <TrainerPage solvedSpot={solvedSpot} onOpenPostflop={() => setPage('postflop')} />
+        </main>
+
+        <main className="page" hidden={page !== 'drill'}>
+          <RangeDrillPage />
         </main>
 
         <main className="page" hidden={page !== 'calculators'}>

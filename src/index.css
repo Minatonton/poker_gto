@@ -1761,3 +1761,53 @@ textarea {
 .shortcut .card > .card-header {
   display: none;
 }
+
+/* ---------- レンジ暗記 ---------- */
+
+.range-grid.paintable .range-cell {
+  cursor: crosshair;
+}
+
+.range-cell.marked::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 2px solid #ffd166;
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+.current-step {
+  border-left-color: var(--accent);
+}
+
+.drill-grids {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.drill-grids.single {
+  grid-template-columns: minmax(0, 760px);
+}
+
+@media (max-width: 1100px) {
+  .drill-grids {
+    grid-template-columns: 1fr;
+  }
+}
+
+.grid-caption {
+  margin: 0 0 8px;
+}
+
+.drill-result {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.drill-result strong {
+  font-size: 28px;
+}
