@@ -1,5 +1,6 @@
 import type { PostflopSpot } from '../../poker/postflopSpot'
 import { equityCurve, toBb, type EquityPoint } from '../../solver/aggregate'
+import { rangeShape } from '../../solver/breakdown'
 import type { PlayerNode } from '../../solver/types'
 import { formatPercent } from '../actionColors'
 
@@ -10,9 +11,10 @@ interface Props {
 
 /** 両者のレンジ全体の EQ・EV・EQR。どちらのレンジが有利かと、EQ をどれだけ実現できているかを比べる */
 export function RangeSummaryCard({ spot, node }: Props) {
+  const shapeOf = (side: 0 | 1) => rangeShape(node.player === side ? node.hands : node.opponentHands)
   const rows = [
-    { position: spot.oop, side: 'OOP', summary: node.ranges[0], acting: node.player === 0 },
-    { position: spot.ip, side: 'IP', summary: node.ranges[1], acting: node.player === 1 },
+    { position: spot.oop, side: 'OOP', summary: node.ranges[0], acting: node.player === 0, shape: shapeOf(0) },
+    { position: spot.ip, side: 'IP', summary: node.ranges[1], acting: node.player === 1, shape: shapeOf(1) },
   ]
   return (
     <section className="card">
@@ -26,10 +28,11 @@ export function RangeSummaryCard({ spot, node }: Props) {
               EQR
             </th>
             <th className="num">combos</th>
+            <th title="EQ 75%以上・中間・25%以下のコンボの割合から判定">レンジの形</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map(({ position, side, summary, acting }) => (
+          {rows.map(({ position, side, summary, acting, shape }) => (
             <tr key={side} className={acting ? 'acting' : ''}>
               <th>
                 {position}
@@ -39,6 +42,13 @@ export function RangeSummaryCard({ spot, node }: Props) {
               <td className="num">{toBb(summary.ev).toFixed(2)}bb</td>
               <td className="num">{formatPercent(summary.eqr)}</td>
               <td className="num muted">{summary.combos.toFixed(1)}</td>
+              <td>
+                {shape.label}
+                <span className="muted small">
+                  {' '}
+                  強 {formatPercent(shape.strong)}・中 {formatPercent(shape.medium)}・弱 {formatPercent(shape.weak)}
+                </span>
+              </td>
             </tr>
           ))}
         </tbody>

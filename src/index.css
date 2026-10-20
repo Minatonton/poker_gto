@@ -1811,3 +1811,29 @@ textarea {
 .drill-result strong {
   font-size: 28px;
 }
+
+/* ---------- レンジの構成 ---------- */
+
+.breakdown-table {
+  margin: 0 16px 8px;
+  width: calc(100% - 32px);
+}
+
+.breakdown-table td:last-child {
+  width: 40%;
+}
+
+.strategy-bar {
+  display: flex;
+  height: 10px;
+  overflow: hidden;
+  background: var(--mist);
+  border-radius: 3px;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 10px;
+}

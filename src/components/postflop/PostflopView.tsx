@@ -12,6 +12,7 @@ import { ActionBar } from '../table/ActionBar'
 import { HandHistory, type HistoryEntry } from '../table/HandHistory'
 import { PokerTable, type SeatView } from '../table/PokerTable'
 import { BoardCards, CardPicker } from './Cards'
+import { RangeBreakdown } from './RangeBreakdown'
 import { EquityGraph, RangeSummaryCard } from './RangeSummary'
 import { SolveSettings } from './SolveSettings'
 
@@ -298,7 +299,12 @@ function NodeBody({ spot, hero, node }: { spot: PostflopSpot; hero: Hero; node: 
         potBb={toBb(node.pot)}
         heroHand={heroHand}
         aside={heroHand && hero.cards && <HeroComboCard node={node} cards={hero.cards} />}
-        below={<EquityGraph spot={spot} node={node} />}
+        below={
+          <>
+            <RangeBreakdown node={node} />
+            <EquityGraph spot={spot} node={node} />
+          </>
+        }
       />
     </>
   )
