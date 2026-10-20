@@ -207,3 +207,35 @@ export function explainPostflop(input: PostflopExplainInput): string[] {
   }
   return lines
 }
+
+export interface PreflopSizeInput {
+  gtoAmount: number
+  chosenAmount: number
+  /** 自分がレイズする前に真ん中にあるチップ（bb） */
+  potBefore: number
+  /** 自分がすでに出している額（ブラインドなど） */
+  heroInvested: number
+  /** 主に相手をする人。オープンなら BB、レイズを受けているならレイズした人 */
+  opponent: string
+  opponentInvested: number
+}
+
+/**
+ * レイズの額が GTO と違うときの説明。大きすぎる・小さすぎるのどちらにも理由があり、
+ * GTO の額はその釣り合いの点だと伝える。片側の理由だけだと「小さく打てば安全」と誤解されるため。
+ * 相手の必要勝率を両方の額で並べ、額が相手に与える条件を数字で比べられるようにする
+ */
+export function explainPreflopSize(input: PreflopSizeInput): string[] {
+  const { gtoAmount, chosenAmount, potBefore, heroInvested, opponent, opponentInvested } = input
+  const opponentRequired = (size: number) =>
+    requiredEquity(potBefore + size - heroInvested, size - opponentInvested)
+  const numbers = `${opponent} がコールに必要な勝率は、${chosenAmount}bb なら ${pct(opponentRequired(chosenAmount))}、GTO の ${gtoAmount}bb なら ${pct(opponentRequired(gtoAmount))} です。`
+  const tooSmall = chosenAmount < gtoAmount
+  return [
+    `レイズは正解ですが、額は ${gtoAmount}bb が GTO の基準です。${numbers}`,
+    tooSmall
+      ? `小さく打つと相手は安い値段で参加できるので、本来なら降りるはずの弱い手までコールしてきます。降ろせたはずのポットを取り損ね、強い手を持っていても、育つポットが小さくなります。`
+      : `大きく打つと、払ってほしい弱い手が降り、残るのはあなたに勝てる強い手が中心になります。降りてくれたときの取り分は少ししか増えないのに、負けるときに失う額が大きくなります。`,
+    `GTO の額は、降りてほしい手には降りてもらい、払ってほしい手にはついて来てもらう、その釣り合いの点です。`,
+  ]
+}

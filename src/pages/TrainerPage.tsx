@@ -34,7 +34,7 @@ import {
   type PreflopDrillKind,
   type PreflopQuestion,
 } from '../trainer/preflopDrill'
-import { explainPostflop, explainPreflop } from '../trainer/explain'
+import { explainPostflop, explainPreflop, explainPreflopSize } from '../trainer/explain'
 import { equityVsRange } from '../poker/equity'
 import { dealerOf, seatOf, seatsFromBottom, tableState } from '../poker/table'
 import { classifyHand } from '../poker/handCategory'
@@ -291,6 +291,21 @@ function SessionCard({ answers, progress }: { answers: SessionAnswer[]; progress
 
 const rollRng = () => Math.random()
 
+/** レイズの額が GTO と違うときの説明。相手は、オープンなら BB、レイズを受けているならレイズした人 */
+function sizeExplanation(question: PreflopQuestion, chosenAmount: number, gtoAmount: number): string[] {
+  const { steps, positions, position } = question.walk
+  const state = tableState(steps, positions)
+  const raiser = steps.findLast((s) => s.action.kind === 'raise' && s.position !== position)?.position
+  return explainPreflopSize({
+    gtoAmount,
+    chosenAmount,
+    potBefore: state.pot,
+    heroInvested: seatOf(state, position).invested,
+    opponent: raiser ?? 'BB',
+    opponentInvested: raiser ? state.currentBet : 1,
+  })
+}
+
 /** レイズの額を選ばせる候補。データの額を答えとして、ほかの候補と並べる */
 function raiseSizesOf(question: PreflopQuestion): number[] | undefined {
   const raise = question.walk.strategy.actions.find((a) => a.kind === 'raise')
@@ -347,21 +362,17 @@ function PreflopTrainer({
     const grade = withSizing(actionGrade, sizeIsGto)
     // レイズ自体が間違いのときは、サイズより先に直すことがあるので、サイズの説明は出さない
     const sizeMatters = !sizeIsGto && grade !== actionGrade
-    const sizeLine = sizeMatters
-      ? [
-          `レイズは正解ですが、サイズは ${gtoAmount}bb が GTO の基準です。選んだ ${amount}bb では、${
-            amount! > gtoAmount!
-              ? '弱い手に降りられやすく、強い手にだけ続けられます'
-              : '相手に安くついて来られ、主導権の価値が下がります'
-          }。`,
-        ]
-      : []
+    const sizeLine = sizeMatters ? sizeExplanation(question, amount!, gtoAmount!) : []
     setAnswer({
       chosen: index,
       grade,
       amount,
       sizeMiss: sizeMatters,
-      explanation: [...sizeLine, ...preflopExplanation(question, frequencies, index)],
+      // 額だけが違うときは、頻度の行（「選んだ Raise 2.5bb が最も多く選ばれます」）を外す。
+      // 別の額を選んだ人には、選んだものが正解だと言っているように読めてしまうため
+      explanation: sizeMatters
+        ? [...sizeLine, ...preflopExplanation(question, frequencies, index).slice(1)]
+        : preflopExplanation(question, frequencies, index),
     })
     setTab('range')
     onGrade(grade)
@@ -592,7 +603,7 @@ function ResultCard({
       </ul>
       {explanation.length > 0 && (
         <div className="result-why">
-          <strong>{isGood(grade) ? '解説' : 'なぜ別のアクションを選ぶべきか'}</strong>
+          <strong>{sizeMiss ? 'なぜこの額なのか' : isGood(grade) ? '解説' : 'なぜ別のアクションを選ぶべきか'}</strong>
           <ul>
             {explanation.map((line, i) => (
               <li key={i}>{line}</li>

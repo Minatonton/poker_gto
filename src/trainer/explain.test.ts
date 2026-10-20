@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { explainPostflop, explainPreflop } from './explain'
+import { explainPostflop, explainPreflop, explainPreflopSize } from './explain'
 
 const raise = { kind: 'raise' as const, label: 'Raise 2.5bb' }
 const threeBet = { kind: 'raise' as const, label: '3Bet 11bb' }
@@ -120,5 +120,30 @@ describe('explainPostflop', () => {
       pot: 7.5,
     })
     expect(lines.join()).toContain('コールに必要な勝率は 21.1%')
+  })
+})
+
+describe('explainPreflopSize', () => {
+  const open = { gtoAmount: 2.5, potBefore: 1.5, heroInvested: 0, opponent: 'BB', opponentInvested: 1 }
+
+  it('両方の額で、相手がコールに必要な勝率を並べる', () => {
+    const [numbers] = explainPreflopSize({ ...open, chosenAmount: 2 })
+    expect(numbers).toContain('2bb なら 22.2%')
+    expect(numbers).toContain('2.5bb なら 27.3%')
+  })
+
+  it('小さすぎるときは、相手が安く広く参加できることを理由に挙げる', () => {
+    const [, reason] = explainPreflopSize({ ...open, chosenAmount: 2 })
+    expect(reason).toContain('安い値段で参加')
+  })
+
+  it('大きすぎるときは、弱い手が降りて強い手だけが残ることを理由に挙げる', () => {
+    const [, reason] = explainPreflopSize({ ...open, chosenAmount: 4 })
+    expect(reason).toContain('強い手が中心')
+  })
+
+  it('どちらの向きでも、GTO の額は釣り合いの点だと締める', () => {
+    const lines = explainPreflopSize({ ...open, chosenAmount: 4 })
+    expect(lines.at(-1)).toContain('釣り合い')
   })
 })

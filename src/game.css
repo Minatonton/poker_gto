@@ -1216,3 +1216,15 @@ main.page {
 .stage-controls .size-option {
   overflow: visible;
 }
+
+/* ドックは幅が狭いので、選択肢が多い切り替えは折り返す */
+.dock .segmented-row {
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: start;
+}
+
+.dock .segmented {
+  display: flex;
+  flex-wrap: wrap;
+  width: auto;
+}
